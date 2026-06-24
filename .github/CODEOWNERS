@@ -1,0 +1,4 @@
+name: CODEOWNERS
+
+# All changes require review by the maintainer
+* @ArthurHtr

@@ -1,0 +1,21 @@
+name: Issue Configuration
+
+issue_templates:
+  - name: Bug Report
+    description: Report a bug
+    labels: [bug]
+    assignments:
+      - ArthurHtr
+    icons:
+      path: .github/assets/bug.png
+  - name: Feature Request
+    description: Suggest an improvement
+    labels: [enhancement]
+    assignments:
+      - ArthurHtr
+    icons:
+      path: .github/assets/feature.png
+
+enabled_issues: true
+
+security_link: SECURITY.md

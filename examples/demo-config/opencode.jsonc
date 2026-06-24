@@ -1,0 +1,34 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "build",
+  "model": "local/demo-model",
+  "agents": {
+    "build": {
+      "description": "Main agent responsible for implementing, testing, and delivering changes.",
+      "mode": "primary",
+      "prompt": "You are a build agent. Help the user implement their requests.",
+      "permission": {
+        "task": {
+          "architect": "allow"
+        },
+        "bash": "allow",
+        "read": "allow",
+        "edit": "allow"
+      }
+    },
+    "architect": {
+      "description": "Sub-agent for code review and architectural decisions.",
+      "mode": "subagent",
+      "prompt": "You are an architect agent. Review code structure and suggest improvements.",
+      "permission": {
+        "read": "allow",
+        "glob": "allow"
+      }
+    }
+  },
+  "permission": {
+    "task": {
+      "architect": "allow"
+    }
+  }
+}

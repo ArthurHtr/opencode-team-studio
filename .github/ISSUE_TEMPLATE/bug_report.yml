@@ -1,0 +1,106 @@
+name: Bug Report
+description: File a bug report.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Important:** Do not include secrets, API keys, tokens, or personal data in this form.
+
+  - type: input
+    id: version
+    attributes:
+      label: Application version
+      description: What version of OpenCode Team Studio are you running?
+      placeholder: e.g. 0.1.0-alpha.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      description: How did you install OpenCode Team Studio?
+      options:
+        - Docker (ghcr.io image)
+        - Docker Compose
+        - From source (pnpm)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      description: What operating system are you using?
+      placeholder: e.g. Ubuntu 24.04, macOS 15.0, Windows/WSL2
+    validations:
+      required: true
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker version
+      description: What version of Docker are you using? (if applicable)
+      placeholder: e.g. 29.5.3
+    validations:
+      required: false
+
+  - type: input
+    id: opencode-version
+    attributes:
+      label: OpenCode version
+      description: What version of OpenCode are you configuring? (if applicable)
+      placeholder: e.g. latest
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Describe the steps to reproduce the bug.
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: |
+        Provide cleaned logs (no secrets). Use:
+        - `docker logs opencode-team-studio`
+        - `docker compose logs -f studio`
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: No secrets included
+      description: I confirm that this form does not contain any secrets, API keys, tokens, or personal data.
+      options:
+        - label: I have removed all sensitive data from this report
+          required: true

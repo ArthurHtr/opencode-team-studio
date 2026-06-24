@@ -1,0 +1,44 @@
+name: Feature Request
+description: Suggest an idea for this project.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Important:** Do not include secrets, API keys, tokens, or personal data in this form.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What problem are you trying to solve?
+      placeholder: "As a user, I want to ... so that ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Desired behavior
+      description: What behavior do you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What alternative solutions have you considered?
+
+  - type: input
+    id: opencode-compat
+    attributes:
+      label: OpenCode compatibility
+      description: How does this feature relate to OpenCode configuration?
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or mockups (optional)
+      description: Any screenshots, wireframes, or mockups that help illustrate the request.
+      placeholder: Drag and drop images here

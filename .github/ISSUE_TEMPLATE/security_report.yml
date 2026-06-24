@@ -1,0 +1,17 @@
+name: Security Report
+description: Report a security vulnerability.
+labels: ["security"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not disclose the vulnerability publicly.**
+        For security issues, please use [GitHub Private Vulnerability Reporting](https://github.com/ArthurHtr/opencode-team-studio/security/advisories/new) instead.
+
+  - type: textarea
+    attributes:
+      label: This form is for non-sensitive reports only
+      description: |
+        If you are reporting a security vulnerability, please use the private advisory system.
+        This form is for non-security issues such as misconfigured security settings.

@@ -1,0 +1,13 @@
+services:
+  studio:
+    image: ghcr.io/arthurhtr/opencode-team-studio:${STUDIO_VERSION:-0.1.0-alpha.1}
+    container_name: opencode-team-studio
+    restart: unless-stopped
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    ports:
+      - "127.0.0.1:${STUDIO_PORT:-3210}:3000"
+    environment:
+      HOME: /tmp
+      OPENCODE_CONFIG_DIR: /config
+    volumes:
+      - "${OPENCODE_HOST_CONFIG_DIR:-$HOME/.config/opencode}:/config"
