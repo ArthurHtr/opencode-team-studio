@@ -61,7 +61,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Then open: `http://127.0.0.1:3210`
@@ -71,7 +71,7 @@ Then open: `http://127.0.0.1:3210`
 ```yaml
 services:
   studio:
-    image: ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+    image: ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
     container_name: opencode-team-studio
     restart: unless-stopped
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"

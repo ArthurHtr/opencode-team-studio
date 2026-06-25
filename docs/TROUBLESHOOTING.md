@@ -30,7 +30,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Or set `LOCAL_UID` and `LOCAL_GID` in your `.env` file:
@@ -53,7 +53,7 @@ docker run -d \
   -e HOME=/tmp \
   -e OPENCODE_CONFIG_DIR=/config \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Or stop the existing container:
@@ -87,7 +87,7 @@ sudo systemctl enable docker
 1. Check your internet connection
 2. Verify the image tag exists:
    ```bash
-   docker pull ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+   docker pull ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
    ```
 3. Build locally from source:
    ```bash

@@ -11,7 +11,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Open `http://127.0.0.1:3210`.
@@ -77,7 +77,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 ## Windows (WSL2)
@@ -92,7 +92,7 @@ docker run -d ^
   -e OPENCODE_CONFIG_DIR=/config ^
   -p 127.0.0.1:3210:3000 ^
   -v "$HOME/.config/opencode:/config" ^
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Or from WSL2 bash:
@@ -105,7 +105,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 ## Changing the port
@@ -119,7 +119,7 @@ docker run -d \
   -e HOME=/tmp \
   -e OPENCODE_CONFIG_DIR=/config \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Or set `STUDIO_PORT` in your `.env` file when using Docker Compose.
@@ -135,7 +135,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/custom/path \
   -p 127.0.0.1:3210:3000 \
   -v /custom/path:/config \
-  ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+  ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 ## Updating the version
@@ -162,7 +162,7 @@ Your configuration is preserved in the mounted volume.
 ```bash
 docker stop opencode-team-studio
 docker rm opencode-team-studio
-docker rmi ghcr.io/arthurhtr/opencode-team-studio:0.1.0-alpha.1
+docker rmi ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1
 ```
 
 Your configuration files remain in the mounted volume and are not affected by container removal.
