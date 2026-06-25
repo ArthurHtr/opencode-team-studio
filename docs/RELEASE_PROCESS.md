@@ -152,10 +152,51 @@ Pushing the tag triggers:
 
 | Concept | Description |
 |---------|------------|
-| **Git tag** | Lightweight or signed annotation in the Git repository |
+| **Git tag** | Lightweight or signed annotation in the Git repository (e.g. `v0.1.0-alpha.1`) |
 | **GitHub Release** | GitHub UI entity with release notes, attached assets, and download links |
 | **Docker image** | Container image published to GHCR, tagged with the version |
-| **package.json version** | Semantic version string used by Node.js tooling |
+| **package.json version** | Semantic version string used by Node.js tooling (no `v` prefix) |
+
+## Tag conventions
+
+For version `0.1.0-alpha.1`:
+
+| File / System | Value |
+|---------------|-------|
+| `package.json` version | `0.1.0-alpha.1` (no `v`) |
+| `CITATION.cff` version | `0.1.0-alpha.1` (no `v`) |
+| Git tag | `v0.1.0-alpha.1` (with `v`) |
+| GHCR image tag | `v0.1.0-alpha.1` (with `v`) |
+| GitHub Release tag | `v0.1.0-alpha.1` (with `v`) |
+
+The `v` prefix is used for Git tags, Docker images, and GitHub Releases.
+The `package.json` and `CITATION.cff` use the bare semantic version without `v`.
+
+### Prerelease vs stable tags
+
+The `container.yml` workflow applies different Docker tags based on the version type:
+
+| Version type | Docker tags published |
+|-------------|----------------------|
+| `v0.1.0-alpha.1` | `v0.1.0-alpha.1`, `0.1.0-alpha.1` (no `latest`) |
+| `v0.1.0-beta.1` | `v0.1.0-beta.1`, `0.1.0-beta.1` (no `latest`) |
+| `v0.1.0-rc.1` | `v0.1.0-rc.1`, `0.1.0-rc.1` (no `latest`) |
+| `v0.1.0` | `v0.1.0`, `0.1.0`, `0.1`, `0`, `latest` |
+| `v1.2.3` | `v1.2.3`, `1.2.3`, `1.2`, `1`, `latest` |
+
+**Never** publish `latest` for a prerelease. The workflow enforces this.
+
+## Correct release order
+
+For the next version:
+
+1. Export the version from GitLab to the public GitHub repository
+2. Push the release commit to `main`
+3. Wait for CI to pass (all checks green)
+4. Create and push the signed Git tag
+5. Wait for GHCR image publication
+6. Verify or create the GitHub Release
+7. Test `docker pull` from GHCR
 
 All four should match for a given release.
 

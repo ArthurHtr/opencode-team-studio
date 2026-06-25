@@ -216,6 +216,20 @@ When modifying an existing field, only that field's value changes.
 - [ ] No new external network calls
 - [ ] No new environment variables that could contain secrets
 
+## Continuous integration
+
+Every push and pull request to `main` is validated automatically:
+
+- Dependency installation from the lockfile (`pnpm install --frozen-lockfile`)
+- TypeScript type checking (`pnpm run typecheck`)
+- Linting (`pnpm run lint`)
+- Automated tests (`pnpm run test`)
+- Next.js production build (`pnpm run build`)
+- Docker image build (`docker build`)
+- Docker Compose validation (`docker compose config`)
+
+All CI checks must pass before a pull request can be merged.
+
 ## Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md).

@@ -12,10 +12,10 @@ OpenCode Team Studio is an independent community project. It is not built, maint
 
 [![CI](https://github.com/ArthurHtr/opencode-team-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/ArthurHtr/opencode-team-studio/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ArthurHtr/opencode-team-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/ArthurHtr/opencode-team-studio/actions/workflows/codeql.yml)
-[![Container](https://ghcr-badge.egpl.dev/arthurhtr/opencode-team-studio/latest-tag?ignore=latest&name=Container&label=GHCR)](https://github.com/ArthurHtr/opencode-team-studio/pkgs/container/opencode-team-studio)
-[![Release](https://img.shields.io/github/v/release/ArthurHtr/opencode-team-studio)](https://github.com/ArthurHtr/opencode-team-studio/releases)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
-[![Status: Alpha](https://img.shields.io/badge/Status-Alpha-orange.svg)](#status)
+[![Release](https://img.shields.io/github/v/release/ArthurHtr/opencode-team-studio?include_prereleases&label=release)](https://github.com/ArthurHtr/opencode-team-studio/releases)
+[![License: Apache-2.0](https://img.shields.io/github/license/ArthurHtr/opencode-team-studio)](./LICENSE)
+[![GHCR](https://img.shields.io/badge/container-GHCR-blue)](https://github.com/users/ArthurHtr/packages/container/package/opencode-team-studio)
+[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
 
 ## Demo
 
@@ -108,6 +108,16 @@ pnpm run start
 - No telemetry is enabled by default
 - No data is sent to external services without explicit user action
 - **Credential policy**: Provider authentication is managed by OpenCode. Run `/connect` in OpenCode to authenticate providers. The Studio does not store or verify API keys. Sensitive fields in configuration editors support environment variable references (`{env:ANTHROPIC_API_KEY}`).
+
+## Releases
+
+The current public version is:
+
+- `v0.1.0-alpha.1`
+- Status: alpha pre-release
+- Container: `ghcr.io/arthurhtr/opencode-team-studio:v0.1.0-alpha.1`
+
+See all published versions in the [GitHub Releases](https://github.com/ArthurHtr/opencode-team-studio/releases) page.
 
 ## Status
 

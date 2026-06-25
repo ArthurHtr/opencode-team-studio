@@ -28,22 +28,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/arthurhtr/opencode-team-studio
-          tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Determine tags
+        id: tags
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Strip leading 'v'
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          # Check if this is a prerelease (alpha, beta, rc)
+          if echo "$VERSION" | grep -qE '(alpha|beta|rc)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            # Prereleases: only publish version and tag (no latest)
+            echo "tags=ghcr.io/arthurhtr/opencode-team-studio:${VERSION},ghcr.io/arthurhtr/opencode-team-studio:${TAG}" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            # Stable releases: publish version, tag, major.minor, major, and latest
+            MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            echo "tags=ghcr.io/arthurhtr/opencode-team-studio:${VERSION},ghcr.io/arthurhtr/opencode-team-studio:${TAG},ghcr.io/arthurhtr/opencode-team-studio:${MAJOR_MINOR},ghcr.io/arthurhtr/opencode-team-studio:${MAJOR},ghcr.io/arthurhtr/opencode-team-studio:latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=OpenCode Team Studio
+            org.opencontainers.image.description=A visual workspace for designing, configuring, and managing OpenCode agent teams.
+            org.opencontainers.image.source=https://github.com/ArthurHtr/opencode-team-studio
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
           platforms: linux/amd64,linux/arm64
           provenance: mode=max
           sbom: true

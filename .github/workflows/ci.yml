@@ -72,4 +72,12 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Validate Docker Compose
-        run: docker compose config
+        env:
+          OPENCODE_HOST_CONFIG_DIR: /tmp/opencode-ci
+          LOCAL_UID: "1000"
+          LOCAL_GID: "1000"
+          STUDIO_PORT: "3210"
+          STUDIO_VERSION: "v0.1.0-alpha.1"
+        run: |
+          mkdir -p "$OPENCODE_HOST_CONFIG_DIR"
+          docker compose --env-file <(printf 'OPENCODE_HOST_CONFIG_DIR=%s\nLOCAL_UID=%s\nLOCAL_GID=%s\nSTUDIO_PORT=%s\nSTUDIO_VERSION=%s\n' "$OPENCODE_HOST_CONFIG_DIR" "$LOCAL_UID" "$LOCAL_GID" "$STUDIO_PORT" "$STUDIO_VERSION") config
