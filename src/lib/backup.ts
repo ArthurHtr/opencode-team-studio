@@ -6,7 +6,23 @@ import { getConfigRoot } from "@/lib/env";
 import type { BackupSummary } from "@/lib/types";
 
 const BACKUP_DIRNAME = "backups";
-const EXCLUDED = new Set(["studio", BACKUP_DIRNAME]);
+
+/** Items excluded from backups. Kept small and explicit. */
+const EXCLUDED = new Set([
+  "studio",
+  "studio-data",
+  BACKUP_DIRNAME,
+  "node_modules",
+  ".git",
+  "secrets",
+]);
+
+/** Patterns for directories that look like stale studio backups. */
+const STALE_BACKUP_PREFIX = "studio.backup-";
+
+/** Maximum number of backups to keep. Older ones are pruned automatically. */
+const MAX_BACKUPS = 5;
+
 let queue: Promise<unknown> = Promise.resolve();
 
 export function withConfigTransaction<T>(reason: string, operation: (backup: BackupSummary) => Promise<T>): Promise<T> {
@@ -33,7 +49,8 @@ export async function createConfigBackup(reason: string): Promise<BackupSummary>
 
   const entries = await readdir(root, { withFileTypes: true });
   for (const entry of entries) {
-    if (EXCLUDED.has(entry.name) || entry.name.startsWith(".studio-apply-")) continue;
+    if (EXCLUDED.has(entry.name)) continue;
+    if (/^studio\.backup-/.test(entry.name)) continue;
     await cp(path.join(root, entry.name), path.join(target, entry.name), {
       recursive: true,
       force: true,
@@ -46,10 +63,10 @@ export async function createConfigBackup(reason: string): Promise<BackupSummary>
     path: path.relative(root, target),
     createdAt: createdAt.toISOString(),
     reason,
-    sizeBytes: await directorySize(target),
   };
   await writeFile(path.join(target, "BACKUP_INFO.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
   await ensureLocalDataIgnored(root);
+  await pruneOldBackups(root);
   return summary;
 }
 
@@ -107,6 +124,25 @@ export async function getLatestBackup(): Promise<BackupSummary | undefined> {
   return (await listConfigBackups())[0];
 }
 
+/** Removes backups beyond the maximum, keeping only the most recent ones. */
+async function pruneOldBackups(root: string): Promise<void> {
+  const backupRoot = path.join(root, BACKUP_DIRNAME);
+  let entries: string[];
+  try {
+    entries = (await readdir(backupRoot)).sort().reverse();
+  } catch {
+    return;
+  }
+  const toDelete = entries.slice(MAX_BACKUPS);
+  for (const id of toDelete) {
+    try {
+      await rm(path.join(backupRoot, id), { recursive: true, force: true });
+    } catch {
+      // Ignore errors during pruning (e.g., backup still being written).
+    }
+  }
+}
+
 async function ensureLocalDataIgnored(root: string): Promise<void> {
   const gitignore = path.join(root, ".gitignore");
   let content = "";
@@ -117,18 +153,8 @@ async function ensureLocalDataIgnored(root: string): Promise<void> {
   await appendFile(gitignore, `${prefix}\n# OpenCode Team Studio local data\n${missing.join("\n")}\n`, "utf8");
 }
 
-async function directorySize(directory: string): Promise<number> {
-  let total = 0;
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) total += await directorySize(target);
-    else total += (await stat(target)).size;
-  }
-  return total;
-}
-
 function validateBackupId(id: string): void {
-  if (!/^\d{4}-\d{2}-\d{2}T[\d-]+Z$/.test(id)) throw new Error("Identifiant de backup invalide");
+  if (!/^\d{4}-\d{2}-\d{2}T[\d-]+Z$/.test(id)) throw new Error("Invalid backup identifier");
 }
 
 function timestampId(date: Date): string {

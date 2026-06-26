@@ -7,21 +7,21 @@ export const PERMISSION_ACTIONS: PermissionAction[] = ["allow", "ask", "deny"];
  * in existing configurations. The UI keeps unknown permission keys untouched.
  */
 export const NATIVE_TOOLS = [
-  { id: "read", label: "Lire les fichiers", shortLabel: "read", description: "Lire le contenu des fichiers autorisés.", category: "files" },
-  { id: "edit", label: "Modifier les fichiers", shortLabel: "edit", description: "Créer et modifier des fichiers. Cette permission couvre aussi write et apply_patch.", category: "files" },
-  { id: "glob", label: "Rechercher des fichiers", shortLabel: "glob", description: "Localiser des fichiers à partir de motifs.", category: "search" },
-  { id: "grep", label: "Rechercher dans le code", shortLabel: "grep", description: "Chercher du texte ou des expressions régulières.", category: "search" },
-  { id: "list", label: "Lister les dossiers", shortLabel: "list", description: "Compatibilité avec les configurations qui exposent un outil de listage.", category: "search" },
-  { id: "lsp", label: "Language Server", shortLabel: "lsp", description: "Utiliser les diagnostics, références et symboles du LSP.", category: "search" },
-  { id: "bash", label: "Commandes terminal", shortLabel: "bash", description: "Exécuter des commandes et scripts shell.", category: "execution" },
-  { id: "task", label: "Déléguer à un agent", shortLabel: "task", description: "Invoquer les sous-agents autorisés.", category: "team" },
-  { id: "skill", label: "Charger des skills", shortLabel: "skill", description: "Découvrir et charger les procédures spécialisées autorisées.", category: "team" },
-  { id: "todowrite", label: "Liste de tâches", shortLabel: "todo", description: "Créer et mettre à jour la liste de tâches interne.", category: "team" },
-  { id: "question", label: "Questions utilisateur", shortLabel: "question", description: "Demander une précision à l’utilisateur.", category: "interaction" },
-  { id: "webfetch", label: "Lire une page web", shortLabel: "webfetch", description: "Récupérer le contenu d’une URL.", category: "web" },
-  { id: "websearch", label: "Recherche web", shortLabel: "websearch", description: "Effectuer une recherche sur Internet.", category: "web" },
-  { id: "external_directory", label: "Dossiers externes", shortLabel: "external", description: "Accéder à des chemins situés hors de l’espace de travail.", category: "safety" },
-  { id: "doom_loop", label: "Boucles répétitives", shortLabel: "doom loop", description: "Contrôler la protection contre les boucles d’outils répétitives.", category: "safety" },
+  { id: "read", label: "Read files", shortLabel: "read", description: "Read the contents of authorized files.", category: "files" },
+  { id: "edit", label: "Edit files", shortLabel: "edit", description: "Create and modify files. This permission also covers write and apply_patch.", category: "files" },
+  { id: "glob", label: "Search files", shortLabel: "glob", description: "Locate files from patterns.", category: "search" },
+  { id: "grep", label: "Search code", shortLabel: "grep", description: "Search for text or regular expressions.", category: "search" },
+  { id: "list", label: "List directories", shortLabel: "list", description: "Compatibility with configurations that expose a listing tool.", category: "search" },
+  { id: "lsp", label: "Language Server", shortLabel: "lsp", description: "Use LSP diagnostics, references, and symbols.", category: "search" },
+  { id: "bash", label: "Terminal commands", shortLabel: "bash", description: "Execute commands and shell scripts.", category: "execution" },
+  { id: "task", label: "Delegate to agent", shortLabel: "task", description: "Invoke authorized sub-agents.", category: "team" },
+  { id: "skill", label: "Load skills", shortLabel: "skill", description: "Discover and load authorized specialized procedures.", category: "team" },
+  { id: "todowrite", label: "Task list", shortLabel: "todo", description: "Create and update the internal task list.", category: "team" },
+  { id: "question", label: "User questions", shortLabel: "question", description: "Ask the user for clarification.", category: "interaction" },
+  { id: "webfetch", label: "Read web page", shortLabel: "webfetch", description: "Fetch the content of a URL.", category: "web" },
+  { id: "websearch", label: "Web search", shortLabel: "websearch", description: "Perform a search on the Internet.", category: "web" },
+  { id: "external_directory", label: "External directories", shortLabel: "external", description: "Access paths located outside the workspace.", category: "safety" },
+  { id: "doom_loop", label: "Repetitive loops", shortLabel: "doom loop", description: "Control protection against repetitive tool loops.", category: "safety" },
 ] as const;
 
 export function evaluatePermission(value: PermissionValue | undefined, target = "*"): PermissionAction | undefined {

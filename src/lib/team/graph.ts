@@ -1,6 +1,14 @@
 import type { Edge, Node } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
-import { evaluatePermission, hasExplicitRule, NATIVE_TOOLS, removePermissionTarget, renamePermissionTarget, setPermissionTarget, setPermissionValue } from "@/lib/team/permissions";
+import {
+  evaluatePermission,
+  hasExplicitRule,
+  NATIVE_TOOLS,
+  removePermissionTarget,
+  renamePermissionTarget,
+  setPermissionTarget,
+  setPermissionValue,
+} from "@/lib/team/permissions";
 import type {
   AgentDefinition,
   GraphLayout,
@@ -30,6 +38,20 @@ export type TeamGraph = {
   nodes: Node<TeamNodeData>[];
   edges: Edge<TeamRelation>[];
 };
+
+/** Semantic ports exposed by the custom React Flow nodes. */
+export const HANDLE_IDS = {
+  taskIn: "task-in",
+  taskOut: "task-out",
+  skillOut: "skill-out",
+  mcpOut: "mcp-out",
+  toolOut: "tool-out",
+  modelOut: "model-out",
+  skillIn: "skill-in",
+  mcpIn: "mcp-in",
+  toolIn: "tool-in",
+  modelIn: "model-in",
+} as const;
 
 export const DEFAULT_FILTERS: GraphFilters = {
   showDisabled: false,
@@ -81,26 +103,122 @@ export function removeRelation(snapshot: TeamSnapshot, relation: TeamRelation): 
   return applyRelationChoice(snapshot, relation, relation.inherited ? "deny" : "inherit");
 }
 
-export function addConnectionRelation(snapshot: TeamSnapshot, sourceId: string, targetId: string, action: PermissionAction = "allow"): { snapshot: TeamSnapshot; relation?: TeamRelation; error?: string } {
+export function addConnectionRelation(
+  snapshot: TeamSnapshot,
+  sourceId: string,
+  targetId: string,
+  action: PermissionAction = "allow",
+  sourceHandle?: string | null,
+  targetHandle?: string | null,
+): { snapshot: TeamSnapshot; relation?: TeamRelation; error?: string } {
   const source = parseNodeId(sourceId);
   const target = parseNodeId(targetId);
-  if (source.kind !== "agent") return { snapshot, error: "La source doit être un agent." };
-  if (!target) return { snapshot, error: "Cette ressource ne peut pas être reliée." };
+  if (source.kind !== "agent") return { snapshot, error: "The source must be an agent." };
+
+  const kind: RelationKind = target.kind === "agent" ? "task" : target.kind;
+  const handleError = validateSemanticHandles(kind, sourceHandle, targetHandle);
+  if (handleError) return { snapshot, error: handleError };
+
   if (target.kind === "agent") {
     const targetAgent = snapshot.agents.find((agent) => agent.name === target.name);
-    if (!targetAgent || targetAgent.mode === "primary") return { snapshot, error: "Un agent principal ne peut pas être utilisé comme sous-agent." };
-    if (source.name === target.name) return { snapshot, error: "Un agent ne peut pas se déléguer à lui-même." };
+    if (!targetAgent || targetAgent.mode === "primary") {
+      return { snapshot, error: "A primary agent cannot be used as a sub-agent." };
+    }
+    if (source.name === target.name) return { snapshot, error: "An agent cannot delegate to itself." };
   }
-  const kind = target.kind === "agent" ? "task" : target.kind;
+
+  if (target.kind === "skill" && !snapshot.skills.some((skill) => skill.name === target.name)) {
+    return { snapshot, error: "Skill not found." };
+  }
+  if (target.kind === "mcp" && !snapshot.mcps.some((mcp) => mcp.name === target.name)) {
+    return { snapshot, error: "MCP server not found." };
+  }
+
   const relation: TeamRelation = { source: source.name, target: target.name, kind, action, explicit: true };
   return { snapshot: applyRelationChoice(snapshot, relation, action), relation };
 }
 
-export function reconnectRelation(snapshot: TeamSnapshot, previous: TeamRelation, sourceId: string, targetId: string): { snapshot: TeamSnapshot; relation?: TeamRelation; error?: string } {
-  const withoutPrevious = removeRelation(snapshot, previous);
-  return addConnectionRelation(withoutPrevious, sourceId, targetId, previous.action);
+
+export function isSemanticConnection(
+  sourceId: string | null | undefined,
+  targetId: string | null | undefined,
+  sourceHandle?: string | null,
+  targetHandle?: string | null,
+): boolean {
+  if (!sourceId || !targetId) return false;
+  const source = parseNodeId(sourceId);
+  const target = parseNodeId(targetId);
+  if (source.kind !== "agent") return false;
+  const kind: RelationKind = target.kind === "agent" ? "task" : target.kind;
+  return !validateSemanticHandles(kind, sourceHandle, targetHandle);
 }
 
+export function reconnectRelation(
+  snapshot: TeamSnapshot,
+  previous: TeamRelation,
+  sourceId: string,
+  targetId: string,
+  sourceHandle?: string | null,
+  targetHandle?: string | null,
+): { snapshot: TeamSnapshot; relation?: TeamRelation; error?: string } {
+  const withoutPrevious = removeRelation(snapshot, previous);
+  return addConnectionRelation(withoutPrevious, sourceId, targetId, previous.action, sourceHandle, targetHandle);
+}
+
+
+export type CanvasPaletteKind = "agent" | "skill" | "mcp";
+
+/**
+ * Builds a visual node for an existing resource without changing OpenCode's
+ * configuration. The relationship is only created once the user draws an edge.
+ */
+export function createPaletteCanvasNode(
+  snapshot: TeamSnapshot,
+  kind: CanvasPaletteKind,
+  name: string,
+  position: { x: number; y: number },
+): Node<TeamNodeData> | undefined {
+  let node: Node<TeamNodeData> | undefined;
+  if (kind === "agent") {
+    const agent = snapshot.agents.find((item) => item.name === name);
+    if (agent) node = agentNode(snapshot, agent);
+  } else if (kind === "skill") {
+    const skill = snapshot.skills.find((item) => item.name === name);
+    if (skill) node = skillNode(skill);
+  } else {
+    const mcp = snapshot.mcps.find((item) => item.name === name);
+    if (mcp) node = mcpNode(mcp);
+  }
+  if (!node) return undefined;
+  return {
+    ...node,
+    position,
+    deletable: true,
+    data: { ...node.data, pinned: true, unlinked: true },
+  };
+}
+
+/** Adds nodes explicitly pinned from the palette to the graph of the active view. */
+export function mergePinnedCanvasNodes(
+  snapshot: TeamSnapshot,
+  graphNodes: Node<TeamNodeData>[],
+  pinnedNodeIds: readonly string[] = [],
+): Node<TeamNodeData>[] {
+  const graphIds = new Set(graphNodes.map((node) => node.id));
+  const pinned = new Set(pinnedNodeIds);
+  const result = graphNodes.map((node) => pinned.has(node.id)
+    ? { ...node, data: { ...node.data, pinned: true, unlinked: false } }
+    : node);
+
+  for (const id of pinned) {
+    if (graphIds.has(id)) continue;
+    const parsed = parseNodeId(id);
+    if (parsed.kind !== "agent" && parsed.kind !== "skill" && parsed.kind !== "mcp") continue;
+    const node = createPaletteCanvasNode(snapshot, parsed.kind, parsed.name, { x: 0, y: 0 });
+    if (node) result.push(node);
+  }
+  return result;
+}
 export function renameAgentInSnapshot(snapshot: TeamSnapshot, previous: string, nextAgent: AgentDefinition): TeamSnapshot {
   const renamed = previous !== nextAgent.name;
   return {
@@ -124,7 +242,12 @@ export function removeAgentFromSnapshot(snapshot: TeamSnapshot, name: string): T
   };
 }
 
-export function resolveAgentPermission(snapshot: TeamSnapshot, agent: AgentDefinition, key: string, target = "*"): { action: PermissionAction; inherited: boolean; explicit: boolean } | undefined {
+export function resolveAgentPermission(
+  snapshot: TeamSnapshot,
+  agent: AgentDefinition,
+  key: string,
+  target = "*",
+): { action: PermissionAction; inherited: boolean; explicit: boolean } | undefined {
   const local = evaluatePermission(agent.permission[key], target);
   if (local) return { action: local, inherited: false, explicit: true };
   const global = evaluatePermission(snapshot.globalPermission[key], target) || evaluatePermission(snapshot.globalPermission["*"], key);
@@ -140,7 +263,11 @@ export function viewKey(view: TeamView, selectedAgent: string, selectedResource?
 export function parseNodeId(id: string): { kind: TeamNodeData["kind"]; name: string } {
   const index = id.indexOf(":");
   if (index < 0) return { kind: "agent", name: id };
-  return { kind: id.slice(0, index) as TeamNodeData["kind"], name: id.slice(index + 1) };
+  const kind = id.slice(0, index);
+  if (kind !== "agent" && kind !== "skill" && kind !== "mcp" && kind !== "tool" && kind !== "model") {
+    return { kind: "agent", name: id };
+  }
+  return { kind, name: id.slice(index + 1) };
 }
 
 export function nodeId(kind: TeamNodeData["kind"], name: string): string {
@@ -161,11 +288,16 @@ function createOrganizationGraph(snapshot: TeamSnapshot, filters: GraphFilters, 
 }
 
 function createAgentGraph(snapshot: TeamSnapshot, selectedName: string, filters: GraphFilters, saved?: GraphLayout): TeamGraph {
-  const selected = snapshot.agents.find((agent) => agent.name === selectedName) || snapshot.agents.find((agent) => !agent.disable) || snapshot.agents[0];
+  const selected = snapshot.agents.find((agent) => agent.name === selectedName)
+    || snapshot.agents.find((agent) => !agent.disable)
+    || snapshot.agents[0];
   if (!selected) return { nodes: [], edges: [] };
+
   const nodes: Node<TeamNodeData>[] = [agentNode(snapshot, selected, saved)];
   const edges: Edge<TeamRelation>[] = [];
-  const addNode = (node: Node<TeamNodeData>) => { if (!nodes.some((item) => item.id === node.id)) nodes.push(node); };
+  const addNode = (node: Node<TeamNodeData>) => {
+    if (!nodes.some((item) => item.id === node.id)) nodes.push(node);
+  };
 
   for (const agent of visibleAgents(snapshot, filters)) {
     if (agent.name === selected.name) continue;
@@ -183,38 +315,56 @@ function createAgentGraph(snapshot: TeamSnapshot, selectedName: string, filters:
     }
   }
 
-  if (filters.showSkills) for (const skill of snapshot.skills) {
-    const resolved = resolveAgentPermission(snapshot, selected, "skill", skill.name);
-    if (!shouldShow(resolved, hasExplicitRule(selected.permission.skill, skill.name), filters)) continue;
-    addNode(skillNode(skill, saved));
-    edges.push(makeEdge({ source: selected.name, target: skill.name, kind: "skill", ...relationState(resolved, "deny") }));
+  if (filters.showSkills) {
+    for (const skill of snapshot.skills) {
+      const resolved = resolveAgentPermission(snapshot, selected, "skill", skill.name);
+      if (!shouldShow(resolved, hasExplicitRule(selected.permission.skill, skill.name), filters)) continue;
+      addNode(skillNode(skill, saved));
+      edges.push(makeEdge({ source: selected.name, target: skill.name, kind: "skill", ...relationState(resolved, "deny") }));
+    }
   }
-  if (filters.showMcps) for (const mcp of snapshot.mcps) {
-    const resolved = resolveAgentPermission(snapshot, selected, `${mcp.name}_*`, "*");
-    if (!shouldShow(resolved, hasExplicitRule(selected.permission[`${mcp.name}_*`], "*"), filters)) continue;
-    addNode(mcpNode(mcp, saved));
-    edges.push(makeEdge({ source: selected.name, target: mcp.name, kind: "mcp", ...relationState(resolved, "deny") }));
+
+  if (filters.showMcps) {
+    for (const mcp of snapshot.mcps) {
+      const resolved = resolveAgentPermission(snapshot, selected, `${mcp.name}_*`, "*");
+      if (!shouldShow(resolved, hasExplicitRule(selected.permission[`${mcp.name}_*`], "*"), filters)) continue;
+      addNode(mcpNode(mcp, saved));
+      edges.push(makeEdge({ source: selected.name, target: mcp.name, kind: "mcp", ...relationState(resolved, "deny") }));
+    }
   }
-  if (filters.showTools) for (const tool of NATIVE_TOOLS) {
-    if (tool.id === "task" || tool.id === "skill") continue;
-    const resolved = resolveAgentPermission(snapshot, selected, tool.id, "*");
-    if (!shouldShow(resolved, selected.permission[tool.id] !== undefined, filters)) continue;
-    addNode(toolNode(tool, saved));
-    edges.push(makeEdge({ source: selected.name, target: tool.id, kind: "tool", ...relationState(resolved, "allow") }));
+
+  if (filters.showTools) {
+    for (const tool of NATIVE_TOOLS) {
+      if (tool.id === "task" || tool.id === "skill") continue;
+      const resolved = resolveAgentPermission(snapshot, selected, tool.id, "*");
+      if (!shouldShow(resolved, selected.permission[tool.id] !== undefined, filters)) continue;
+      addNode(toolNode(tool, saved));
+      edges.push(makeEdge({ source: selected.name, target: tool.id, kind: "tool", ...relationState(resolved, "allow") }));
+    }
   }
+
   if (filters.showModels) {
     const model = selected.model || snapshot.defaultModel;
     if (model) {
-      addNode(modelNode(model, selected.model ? "Modèle spécifique" : "Modèle global hérité", saved));
-      edges.push(makeEdge({ source: selected.name, target: model, kind: "model", action: "allow", inherited: !selected.model, explicit: Boolean(selected.model) }));
+      addNode(modelNode(model, selected.model ? "Specific model" : "Inherited global model", saved));
+      edges.push(makeEdge({
+        source: selected.name,
+        target: model,
+        kind: "model",
+        action: "allow",
+        inherited: !selected.model,
+        explicit: Boolean(selected.model),
+      }));
     }
   }
+
   return { nodes, edges };
 }
 
 function createResourceGraph(snapshot: TeamSnapshot, selection: ResourceSelection, filters: GraphFilters, saved?: GraphLayout): TeamGraph {
   const resource = selection || defaultResource(snapshot, filters);
   if (!resource) return { nodes: [], edges: [] };
+
   const nodes: Node<TeamNodeData>[] = [];
   const edges: Edge<TeamRelation>[] = [];
   if (resource.kind === "skill") {
@@ -254,6 +404,7 @@ function createResourceGraph(snapshot: TeamSnapshot, selection: ResourceSelectio
     nodes.push(agentNode(snapshot, agent, saved));
     edges.push(makeEdge({ source: agent.name, target: resource.name, kind: resource.kind, ...relationState(resolved, "deny") }));
   }
+
   return { nodes, edges };
 }
 
@@ -262,37 +413,74 @@ function createCompleteGraph(snapshot: TeamSnapshot, filters: GraphFilters, save
   const nodes: Node<TeamNodeData>[] = agents.map((agent) => agentNode(snapshot, agent, saved));
   const edges: Edge<TeamRelation>[] = [];
 
-  for (const source of agents) for (const target of agents) {
-    if (source.name === target.name || target.mode === "primary") continue;
-    addPermissionEdge(edges, snapshot, source, "task", target.name, filters);
+  for (const source of agents) {
+    for (const target of agents) {
+      if (source.name === target.name || target.mode === "primary") continue;
+      addPermissionEdge(edges, snapshot, source, "task", target.name, filters);
+    }
   }
+
   if (filters.showSkills) snapshot.skills.forEach((skill) => nodes.push(skillNode(skill, saved)));
   if (filters.showMcps) snapshot.mcps.forEach((mcp) => nodes.push(mcpNode(mcp, saved)));
-  if (filters.showTools) NATIVE_TOOLS.filter((tool) => tool.id !== "task" && tool.id !== "skill").forEach((tool) => nodes.push(toolNode(tool, saved)));
+  if (filters.showTools) {
+    NATIVE_TOOLS
+      .filter((tool) => tool.id !== "task" && tool.id !== "skill")
+      .forEach((tool) => nodes.push(toolNode(tool, saved)));
+  }
 
   const models = new Set<string>();
   if (filters.showModels) {
-    for (const agent of agents) if (agent.model || snapshot.defaultModel) models.add(agent.model || snapshot.defaultModel || "");
-    [...models].filter(Boolean).forEach((model) => nodes.push(modelNode(model, "Modèle utilisé par l’équipe", saved)));
+    for (const agent of agents) {
+      const model = agent.model || snapshot.defaultModel;
+      if (model) models.add(model);
+    }
+    [...models].forEach((model) => nodes.push(modelNode(model, "Modèle utilisé par l’équipe", saved)));
   }
 
   for (const agent of agents) {
-    if (filters.showSkills) for (const skill of snapshot.skills) addPermissionEdge(edges, snapshot, agent, "skill", skill.name, filters);
-    if (filters.showMcps) for (const mcp of snapshot.mcps) addPermissionEdge(edges, snapshot, agent, "mcp", mcp.name, filters);
-    if (filters.showTools) for (const tool of NATIVE_TOOLS.filter((item) => item.id !== "task" && item.id !== "skill")) addPermissionEdge(edges, snapshot, agent, "tool", tool.id, filters);
+    if (filters.showSkills) {
+      for (const skill of snapshot.skills) addPermissionEdge(edges, snapshot, agent, "skill", skill.name, filters);
+    }
+    if (filters.showMcps) {
+      for (const mcp of snapshot.mcps) addPermissionEdge(edges, snapshot, agent, "mcp", mcp.name, filters);
+    }
+    if (filters.showTools) {
+      for (const tool of NATIVE_TOOLS.filter((item) => item.id !== "task" && item.id !== "skill")) {
+        addPermissionEdge(edges, snapshot, agent, "tool", tool.id, filters);
+      }
+    }
     if (filters.showModels) {
       const model = agent.model || snapshot.defaultModel;
-      if (model) edges.push(makeEdge({ source: agent.name, target: model, kind: "model", action: "allow", inherited: !agent.model, explicit: Boolean(agent.model) }));
+      if (model) {
+        edges.push(makeEdge({
+          source: agent.name,
+          target: model,
+          kind: "model",
+          action: "allow",
+          inherited: !agent.model,
+          explicit: Boolean(agent.model),
+        }));
+      }
     }
   }
+
   return { nodes, edges };
 }
 
-function addPermissionEdge(edges: Edge<TeamRelation>[], snapshot: TeamSnapshot, source: AgentDefinition, kind: Exclude<RelationKind, "model">, target: string, filters: GraphFilters): void {
+function addPermissionEdge(
+  edges: Edge<TeamRelation>[],
+  snapshot: TeamSnapshot,
+  source: AgentDefinition,
+  kind: Exclude<RelationKind, "model">,
+  target: string,
+  filters: GraphFilters,
+): void {
   const key = kind === "mcp" ? `${target}_*` : kind === "tool" ? target : kind;
   const permissionTarget = kind === "mcp" || kind === "tool" ? "*" : target;
   const resolved = resolveAgentPermission(snapshot, source, key, permissionTarget);
-  const explicit = kind === "tool" ? source.permission[key] !== undefined : hasExplicitRule(source.permission[key], permissionTarget);
+  const explicit = kind === "tool"
+    ? source.permission[key] !== undefined
+    : hasExplicitRule(source.permission[key], permissionTarget);
   if (!shouldShow(resolved, explicit, filters)) return;
   edges.push(makeEdge({ source: source.name, target, kind, ...relationState(resolved, "deny") }));
 }
@@ -324,28 +512,60 @@ function agentNode(snapshot: TeamSnapshot, agent: AgentDefinition, saved?: Graph
 
 function skillNode(skill: SkillDefinition, saved?: GraphLayout): Node<TeamNodeData> {
   const id = nodeId("skill", skill.name);
-  return { id, type: "skill", position: saved?.positions[id] || { x: 0, y: 0 }, data: { kind: "skill", name: skill.name, label: skill.name, description: skill.description } };
-}
-function mcpNode(mcp: McpDefinition, saved?: GraphLayout): Node<TeamNodeData> {
-  const id = nodeId("mcp", mcp.name);
-  return { id, type: "mcp", position: saved?.positions[id] || { x: 0, y: 0 }, data: { kind: "mcp", name: mcp.name, label: mcp.name, description: `${mcp.type} · ${mcp.enabled ? "activé" : "désactivé"}`, disabled: !mcp.enabled } };
-}
-function toolNode(tool: typeof NATIVE_TOOLS[number], saved?: GraphLayout): Node<TeamNodeData> {
-  const id = nodeId("tool", tool.id);
-  return { id, type: "tool", position: saved?.positions[id] || { x: 0, y: 0 }, data: { kind: "tool", name: tool.id, label: tool.shortLabel, description: tool.description } };
-}
-function modelNode(model: string, description: string, saved?: GraphLayout): Node<TeamNodeData> {
-  const id = nodeId("model", model);
-  return { id, type: "model", position: saved?.positions[id] || { x: 0, y: 0 }, data: { kind: "model", name: model, label: model, description } };
+  return {
+    id,
+    type: "skill",
+    position: saved?.positions[id] || { x: 0, y: 0 },
+    data: { kind: "skill", name: skill.name, label: skill.name, description: skill.description },
+  };
 }
 
-function makeEdge(relation: TeamRelation): Edge<TeamRelation> {
+function mcpNode(mcp: McpDefinition, saved?: GraphLayout): Node<TeamNodeData> {
+  const id = nodeId("mcp", mcp.name);
+  return {
+    id,
+    type: "mcp",
+    position: saved?.positions[id] || { x: 0, y: 0 },
+    data: {
+      kind: "mcp",
+      name: mcp.name,
+      label: mcp.name,
+      description: `${mcp.type} · ${mcp.enabled ? "active" : "désactive"}`,
+      disabled: !mcp.enabled,
+    },
+  };
+}
+
+function toolNode(tool: typeof NATIVE_TOOLS[number], saved?: GraphLayout): Node<TeamNodeData> {
+  const id = nodeId("tool", tool.id);
+  return {
+    id,
+    type: "tool",
+    position: saved?.positions[id] || { x: 0, y: 0 },
+    data: { kind: "tool", name: tool.id, label: tool.shortLabel, description: tool.description },
+  };
+}
+
+function modelNode(model: string, description: string, saved?: GraphLayout): Node<TeamNodeData> {
+  const id = nodeId("model", model);
+  return {
+    id,
+    type: "model",
+    position: saved?.positions[id] || { x: 0, y: 0 },
+    data: { kind: "model", name: model, label: model, description },
+  };
+}
+
+export function makeEdge(relation: TeamRelation): Edge<TeamRelation> {
   const color = relationColor(relation.kind, relation.action, relation.inherited);
+  const handles = relationHandles(relation.kind);
   return {
     id: `${relation.kind}:${relation.source}:${relation.target}`,
     source: nodeId("agent", relation.source),
     target: nodeId(relation.kind === "task" ? "agent" : relation.kind, relation.target),
-    type: "bezier",
+    sourceHandle: handles.source,
+    targetHandle: handles.target,
+    type: "default",
     reconnectable: relation.kind !== "model" || !relation.inherited,
     animated: relation.action === "ask",
     label: relationLabel(relation.kind),
@@ -356,7 +576,13 @@ function makeEdge(relation: TeamRelation): Edge<TeamRelation> {
     style: {
       stroke: color,
       strokeWidth: relation.kind === "task" ? 2.35 : 1.85,
-      strokeDasharray: relation.inherited ? "3 7" : relation.action === "ask" ? "8 5" : relation.action === "deny" ? "3 6" : undefined,
+      strokeDasharray: relation.inherited
+        ? "3 7"
+        : relation.action === "ask"
+          ? "8 5"
+          : relation.action === "deny"
+            ? "3 6"
+            : undefined,
       opacity: relation.action === "deny" ? 0.62 : relation.inherited ? 0.72 : 0.95,
     },
     markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
@@ -364,31 +590,98 @@ function makeEdge(relation: TeamRelation): Edge<TeamRelation> {
   };
 }
 
+function relationHandles(kind: RelationKind): { source: string; target: string } {
+  if (kind === "task") return { source: HANDLE_IDS.taskOut, target: HANDLE_IDS.taskIn };
+  if (kind === "skill") return { source: HANDLE_IDS.skillOut, target: HANDLE_IDS.skillIn };
+  if (kind === "mcp") return { source: HANDLE_IDS.mcpOut, target: HANDLE_IDS.mcpIn };
+  if (kind === "tool") return { source: HANDLE_IDS.toolOut, target: HANDLE_IDS.toolIn };
+  return { source: HANDLE_IDS.modelOut, target: HANDLE_IDS.modelIn };
+}
+
+function validateSemanticHandles(
+  kind: RelationKind,
+  sourceHandle?: string | null,
+  targetHandle?: string | null,
+): string | undefined {
+  // Programmatic callers and older tests may omit handles. React Flow UI calls
+  // always provide them and therefore receives strict semantic validation.
+  if (!sourceHandle && !targetHandle) return undefined;
+  const expected = relationHandles(kind);
+  if (sourceHandle !== expected.source || targetHandle !== expected.target) {
+    const label = relationLabel(kind);
+    return `Utilise le point d’accroche « ${label} » correspondant pour créer cette connexion.`;
+  }
+  return undefined;
+}
+
 function relationCount(snapshot: TeamSnapshot, agent: AgentDefinition): number {
   let count = 0;
-  for (const target of snapshot.agents) if (target.name !== agent.name && positive(resolveAgentPermission(snapshot, agent, "task", target.name)?.action)) count += 1;
-  for (const skill of snapshot.skills) if (positive(resolveAgentPermission(snapshot, agent, "skill", skill.name)?.action)) count += 1;
-  for (const mcp of snapshot.mcps) if (positive(resolveAgentPermission(snapshot, agent, `${mcp.name}_*`, "*")?.action)) count += 1;
+  for (const target of snapshot.agents) {
+    if (target.name !== agent.name && positive(resolveAgentPermission(snapshot, agent, "task", target.name)?.action)) count += 1;
+  }
+  for (const skill of snapshot.skills) {
+    if (positive(resolveAgentPermission(snapshot, agent, "skill", skill.name)?.action)) count += 1;
+  }
+  for (const mcp of snapshot.mcps) {
+    if (positive(resolveAgentPermission(snapshot, agent, `${mcp.name}_*`, "*")?.action)) count += 1;
+  }
   return count;
 }
 
-function relationState(resolved: ReturnType<typeof resolveAgentPermission>, fallback: PermissionAction): Pick<TeamRelation, "action" | "inherited" | "explicit"> {
+function relationState(
+  resolved: ReturnType<typeof resolveAgentPermission>,
+  fallback: PermissionAction,
+): Pick<TeamRelation, "action" | "inherited" | "explicit"> {
   return { action: resolved?.action || fallback, inherited: resolved?.inherited, explicit: resolved?.explicit };
 }
-function shouldShow(resolved: ReturnType<typeof resolveAgentPermission>, explicit: boolean, filters: GraphFilters): boolean {
+
+function shouldShow(
+  resolved: ReturnType<typeof resolveAgentPermission>,
+  explicit: boolean,
+  filters: GraphFilters,
+): boolean {
   if (!resolved) return false;
   if (resolved.inherited && !filters.showInherited) return false;
   if (resolved.action === "deny" && !filters.showDenied) return false;
   return positive(resolved.action) || explicit || filters.showDenied;
 }
-function positive(action?: PermissionAction): boolean { return action === "allow" || action === "ask"; }
+
+function positive(action?: PermissionAction): boolean {
+  return action === "allow" || action === "ask";
+}
+
 function relationColor(kind: RelationKind, action: PermissionAction, inherited?: boolean): string {
   if (inherited) return "#778196";
   if (action === "deny") return "#ef6b73";
   if (action === "ask") return "#e2ad52";
-  return kind === "task" ? "#9b86ff" : kind === "skill" ? "#4dd49a" : kind === "mcp" ? "#eea451" : kind === "model" ? "#dc7cdd" : "#70a8f5";
+  return kind === "task"
+    ? "#9b86ff"
+    : kind === "skill"
+      ? "#4dd49a"
+      : kind === "mcp"
+        ? "#eea451"
+        : kind === "model"
+          ? "#dc7cdd"
+          : "#70a8f5";
 }
-function relationLabel(kind: RelationKind): string { return kind === "task" ? "délègue" : kind === "skill" ? "skill" : kind === "mcp" ? "MCP" : kind === "model" ? "modèle" : "outil"; }
+
+function relationLabel(kind: RelationKind): string {
+  return kind === "task"
+    ? "delegation"
+    : kind === "skill"
+      ? "skill"
+      : kind === "mcp"
+        ? "MCP"
+        : kind === "model"
+          ? "model"
+          : "outil";
+}
+
+/** Public helper to create a React Flow edge from a TeamRelation with full styling. */
+export function createEdgeFromRelation(relation: TeamRelation): Edge<TeamRelation> {
+  return makeEdge(relation);
+}
+
 function defaultResource(snapshot: TeamSnapshot, filters: GraphFilters): ResourceSelection {
   if (filters.showSkills && snapshot.skills[0]) return { kind: "skill", name: snapshot.skills[0].name };
   if (filters.showMcps && snapshot.mcps[0]) return { kind: "mcp", name: snapshot.mcps[0].name };

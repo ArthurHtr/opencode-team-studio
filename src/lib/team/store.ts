@@ -6,6 +6,7 @@ import { getConfigDocument, updateConfigPath, updateConfigPaths } from "@/lib/co
 import { atomicWrite, exists, readUtf8, removePath, safeConfigPath } from "@/lib/filesystem";
 import { getLatestBackup, withConfigTransaction } from "@/lib/backup";
 import { getStudioLayout, saveStudioLayout } from "@/lib/layout-store";
+import { getStudioMetadata, saveStudioMetadata } from "@/lib/metadata-store";
 import type {
   AgentDefinition,
   McpDefinition,
@@ -13,6 +14,7 @@ import type {
   ProviderSummary,
   SkillDefinition,
   StudioLayout,
+  StudioMetadata,
   TeamApplyInput,
   TeamSnapshot,
 } from "@/lib/types";
@@ -23,12 +25,12 @@ const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BUILTINS: Record<string, Pick<AgentDefinition, "description" | "mode" | "hidden">> = {
   build: { description: "Agent principal chargé d’implémenter, tester et livrer les changements.", mode: "primary", hidden: false },
   plan: { description: "Agent principal chargé d’explorer, analyser et planifier sans modifier le code.", mode: "primary", hidden: false },
-  general: { description: "Sous-agent généraliste pour les recherches et tâches multi-étapes.", mode: "subagent", hidden: false },
-  explore: { description: "Sous-agent rapide de découverte et de recherche dans le codebase.", mode: "subagent", hidden: false },
+  general: { description: "General-purpose sub-agent for research and multi-step tasks.", mode: "subagent", hidden: false },
+  explore: { description: "Rapid discovery and codebase search sub-agent.", mode: "subagent", hidden: false },
   scout: { description: "Sous-agent léger de repérage et d’exploration ciblée.", mode: "subagent", hidden: false },
-  title: { description: "Agent interne utilisé pour générer les titres de session.", mode: "subagent", hidden: true },
-  summary: { description: "Agent interne utilisé pour résumer une session.", mode: "subagent", hidden: true },
-  compaction: { description: "Agent interne utilisé pendant la compaction du contexte.", mode: "subagent", hidden: true },
+  title: { description: "Internal agent used to generate session titles.", mode: "subagent", hidden: true },
+  summary: { description: "Internal agent used to summarize a session.", mode: "subagent", hidden: true },
+  compaction: { description: "Internal agent used during context compaction.", mode: "subagent", hidden: true },
 };
 
 const KNOWN_AGENT_KEYS = new Set([
@@ -37,9 +39,10 @@ const KNOWN_AGENT_KEYS = new Set([
 ]);
 
 export async function getTeamSnapshot(): Promise<TeamSnapshot> {
-  const [configDocument, layout, latestBackup] = await Promise.all([
+  const [configDocument, layout, metadata, latestBackup] = await Promise.all([
     getConfigDocument(),
     getStudioLayout(),
+    getStudioMetadata(),
     getLatestBackup(),
   ]);
   const config = configDocument.value;
@@ -52,6 +55,7 @@ export async function getTeamSnapshot(): Promise<TeamSnapshot> {
     defaultAgent: typeof config.default_agent === "string" ? config.default_agent : "build",
     defaultModel: typeof config.model === "string" ? config.model : undefined,
     layout,
+    metadata,
     latestBackup,
   };
 }
@@ -59,7 +63,7 @@ export async function getTeamSnapshot(): Promise<TeamSnapshot> {
 export async function getAgent(name: string): Promise<AgentDefinition> {
   const snapshot = await getTeamSnapshot();
   const agent = snapshot.agents.find((item) => item.name === name);
-  if (!agent) throw new Error("Agent introuvable");
+  if (!agent) throw new Error("Agent not found");
   return agent;
 }
 
@@ -97,7 +101,8 @@ export async function applyTeamDraft(input: TeamApplyInput): Promise<TeamSnapsho
     }
 
     const normalizedLayout = normalizeLayout(input.layout);
-    await saveStudioLayout(normalizedLayout);
+    const normalizedMetadata = normalizeMetadata(input.metadata, input.snapshot.agents.map((agent) => agent.name));
+    await Promise.all([saveStudioLayout(normalizedLayout), saveStudioMetadata(normalizedMetadata)]);
 
     const verified = await getTeamSnapshot();
     verifyAppliedSnapshot(input.snapshot, verified);
@@ -113,7 +118,7 @@ export async function createAgent(input: Pick<AgentDefinition, "name" | "descrip
   return withConfigTransaction(`Création de l’agent ${input.name}`, async () => {
     validateAgentName(input.name);
     const target = agentFile(input.name);
-    if (await exists(target)) throw new Error("Un agent porte déjà ce nom");
+    if (await exists(target)) throw new Error("An agent already has this name");
     const preset = input.preset || "readonly";
     const agent: AgentDefinition = {
       name: input.name,
@@ -140,18 +145,18 @@ export async function deleteAgent(name: string): Promise<void> {
 }
 
 export async function saveAgentPermission(name: string, permission: PermissionConfig): Promise<AgentDefinition> {
-  return withConfigTransaction(`Modification des permissions de ${name}`, async () => {
+  return withConfigTransaction(`Permission modification for ${name}`, async () => {
     const agent = await getAgent(name);
     return saveAgentRaw({ ...agent, permission }, name);
   });
 }
 
 export async function saveSkill(skill: SkillDefinition, originalName?: string): Promise<SkillDefinition> {
-  return withConfigTransaction(`Modification du skill ${originalName || skill.name}`, async () => {
+  return withConfigTransaction(`Skill modification ${originalName || skill.name}`, async () => {
     validateSkillName(skill.name);
-    if (!skill.description.trim()) throw new Error("La description du skill est obligatoire");
+    if (!skill.description.trim()) throw new Error("The skill description is required");
     const target = skillFile(skill.name);
-    if (originalName && originalName !== skill.name && await exists(target)) throw new Error("Un skill porte déjà ce nom");
+    if (originalName && originalName !== skill.name && await exists(target)) throw new Error("A skill already has this name");
     const frontmatter: Record<string, unknown> = { name: skill.name, description: skill.description };
     if (skill.license) frontmatter.license = skill.license;
     if (skill.compatibility) frontmatter.compatibility = skill.compatibility;
@@ -163,25 +168,25 @@ export async function saveSkill(skill: SkillDefinition, originalName?: string): 
 }
 
 export async function deleteSkill(name: string): Promise<void> {
-  await withConfigTransaction(`Suppression du skill ${name}`, async () => {
+  await withConfigTransaction(`Skill deletion ${name}`, async () => {
     validateSkillName(name);
     await removePath(skillDirectory(name));
   });
 }
 
 export async function saveMcp(mcp: McpDefinition, originalName?: string): Promise<McpDefinition> {
-  return withConfigTransaction(`Modification du MCP ${originalName || mcp.name}`, async () => {
+  return withConfigTransaction(`MCP modification ${originalName || mcp.name}`, async () => {
     validateAgentName(mcp.name);
     if (originalName && originalName !== mcp.name) await updateConfigPath(["mcp", originalName], undefined);
     await updateConfigPath(["mcp", mcp.name], serializeMcp(mcp));
     const saved = (await getTeamSnapshot()).mcps.find((item) => item.name === mcp.name);
-    if (!saved) throw new Error("MCP non enregistré");
+    if (!saved) throw new Error("MCP not registered");
     return saved;
   });
 }
 
 export async function deleteMcp(name: string): Promise<void> {
-  await withConfigTransaction(`Suppression du MCP ${name}`, async () => {
+  await withConfigTransaction(`MCP deletion ${name}`, async () => {
     await updateConfigPath(["mcp", name], undefined);
   });
 }
@@ -197,7 +202,7 @@ async function saveAgentRaw(agent: AgentDefinition, originalName?: string): Prom
     await updateConfigPath(["agent", agent.name], serializeAgentConfig(agent, true));
   } else {
     const target = agentFile(agent.name);
-    if (previousName !== agent.name && await exists(target)) throw new Error("Un agent porte déjà ce nom");
+    if (previousName !== agent.name && await exists(target)) throw new Error("An agent already has this name");
     await atomicWrite(target, serializeAgentMarkdown(agent));
     if (previousName !== agent.name) await removePath(agentFile(previousName));
   }
@@ -218,13 +223,8 @@ async function listAgents(config: Record<string, unknown>): Promise<AgentDefinit
   }
 
   const directory = safeConfigPath("agents");
-  let entries: { name: string; isFile: () => boolean }[];
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    // Directory does not exist — no file-based agents.
-    entries = [];
-  }
+  await mkdir(directory, { recursive: true });
+  const entries = await readdir(directory, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const name = entry.name.slice(0, -3);
@@ -240,13 +240,8 @@ async function listAgents(config: Record<string, unknown>): Promise<AgentDefinit
 
 async function listSkills(): Promise<SkillDefinition[]> {
   const directory = safeConfigPath("skills");
-  let entries: { name: string; isDirectory: () => boolean }[];
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    // Directory does not exist — no skills.
-    entries = [];
-  }
+  await mkdir(directory, { recursive: true });
+  const entries = await readdir(directory, { withFileTypes: true });
   const skills: SkillDefinition[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -394,12 +389,12 @@ function validateTeamDraft(snapshot: TeamSnapshot): void {
   const names = new Set<string>();
   for (const agent of snapshot.agents) {
     validateAgentName(agent.name);
-    if (names.has(agent.name)) throw new Error(`Agent dupliqué : ${agent.name}`);
+    if (names.has(agent.name)) throw new Error(`Duplicated agent : ${agent.name}`);
     names.add(agent.name);
     if (!agent.description.trim()) throw new Error(`La description de ${agent.name} est obligatoire`);
     validatePermission(agent.permission, `agent ${agent.name}`);
   }
-  if (!names.has("build") || !names.has("plan")) throw new Error("Les agents intégrés build et plan doivent rester présents");
+  if (!names.has("build") || !names.has("plan")) throw new Error("Built-in build and plan agents must remain present");
   const defaultAgent = snapshot.agents.find((agent) => agent.name === snapshot.defaultAgent);
   if (!defaultAgent || defaultAgent.mode === "subagent") throw new Error("L’agent par défaut doit être un agent principal");
   validatePermission(snapshot.globalPermission, "configuration globale");
@@ -409,8 +404,8 @@ function validateTeamDraft(snapshot: TeamSnapshot): void {
     validateAgentName(mcp.name);
     if (mcpNames.has(mcp.name)) throw new Error(`MCP dupliqué : ${mcp.name}`);
     mcpNames.add(mcp.name);
-    if (mcp.type === "local" && mcp.command.length === 0) throw new Error(`Le MCP local ${mcp.name} doit avoir une commande`);
-    if (mcp.type === "remote" && !mcp.url) throw new Error(`Le MCP distant ${mcp.name} doit avoir une URL`);
+    if (mcp.type === "local" && mcp.command.length === 0) throw new Error(`Le Local MCP ${mcp.name} doit avoir une commande`);
+    if (mcp.type === "remote" && !mcp.url) throw new Error(`Le Remote MCP ${mcp.name} doit avoir une URL`);
   }
 }
 
@@ -418,8 +413,8 @@ function validatePermission(permission: PermissionConfig, label: string): void {
   for (const [tool, value] of Object.entries(permission)) {
     if (typeof value === "string") continue;
     for (const [pattern, action] of Object.entries(value)) {
-      if (!pattern.trim()) throw new Error(`Motif vide dans les permissions de ${label} (${tool})`);
-      if (!(["allow", "ask", "deny"] as string[]).includes(action)) throw new Error(`Décision invalide pour ${tool} dans ${label}`);
+      if (!pattern.trim()) throw new Error(`Empty pattern in permissions for ${label} (${tool})`);
+      if (!(["allow", "ask", "deny"] as string[]).includes(action)) throw new Error(`Invalid decision for ${tool} dans ${label}`);
     }
   }
 }
@@ -432,6 +427,12 @@ function normalizeLayout(layout: StudioLayout): StudioLayout {
     views[key] = { positions, ...(viewport ? { viewport } : {}) };
   }
   return { version: 2, views };
+}
+
+function normalizeMetadata(metadata: StudioMetadata, agentNames: string[]): StudioMetadata {
+  void metadata;
+  void agentNames;
+  return { version: 2 };
 }
 
 function verifyAppliedSnapshot(expected: TeamSnapshot, actual: TeamSnapshot): void {
@@ -450,17 +451,17 @@ function presetPermission(preset: string): PermissionConfig {
 }
 
 function defaultPrompt(name: string, description: string, preset: string): string {
-  const role = description || `Agent spécialisé ${name}`;
-  return `Tu es ${role}.\n\n## Responsabilités\n\n- Travaille uniquement dans ton périmètre.\n- Appuie chaque constat sur des éléments vérifiables.\n- Signale clairement les incertitudes.\n\n## Mode de travail\n\n${preset === "orchestrator" ? "- Délègue les analyses spécialisées aux sous-agents autorisés.\n- Consolide leurs résultats sans dupliquer les constats." : "- Analyse la demande avant d’agir.\n- Produis un résultat directement exploitable par l’agent appelant."}\n`;
+  const role = description || `Specialized agent ${name}`;
+  return `You are ${role}.\n\n## Responsibilities\n\n- Work only within your scope.\n- Support each finding with verifiable elements.\n- Clearly signal uncertainties.\n\n## Working mode\n\n${preset === "orchestrator" ? "- Delegate specialized analyses to authorized sub-agents.\n- Consolidate their results without duplicating findings." : "- Analyse la demande avant d’agir.\n- Produis un résultat directement exploitable par l’agent appelant."}\n`;
 }
 
 function parseFrontmatter(raw: string): { data: Record<string, unknown>; content: string } {
   const normalized = raw.replace(/\r\n/g, "\n");
   if (!normalized.startsWith("---\n")) return { data: {}, content: normalized };
   const end = normalized.indexOf("\n---\n", 4);
-  if (end === -1) throw new Error("Frontmatter YAML non fermé");
+  if (end === -1) throw new Error("YAML frontmatter not closed");
   const parsed = YAML.parse(normalized.slice(4, end)) ?? {};
-  if (!isRecord(parsed)) throw new Error("Frontmatter YAML invalide");
+  if (!isRecord(parsed)) throw new Error("Invalid YAML frontmatter");
   return { data: parsed, content: normalized.slice(end + 5) };
 }
 
@@ -473,7 +474,7 @@ function agentFile(name: string): string { validateAgentName(name); return safeC
 function skillDirectory(name: string): string { validateSkillName(name); return safeConfigPath("skills", name); }
 function skillFile(name: string): string { return safeConfigPath("skills", name, "SKILL.md"); }
 function validateAgentName(name: string) { if (!AGENT_NAME.test(name)) throw new Error("Nom d’agent invalide"); }
-function validateSkillName(name: string) { if (!SKILL_NAME.test(name)) throw new Error("Le nom du skill doit être en minuscules avec des tirets"); }
+function validateSkillName(name: string) { if (!SKILL_NAME.test(name)) throw new Error("The skill name must be lowercase with hyphens"); }
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function stringValue(value: unknown): string { return typeof value === "string" ? value : ""; }
 function optionalString(value: unknown): string | undefined { return typeof value === "string" && value.length ? value : undefined; }

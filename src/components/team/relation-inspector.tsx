@@ -18,41 +18,41 @@ export function RelationInspector({ relation, snapshot, onClose, onChange, onDel
     <header className="inspector-header">
       <div className="inspector-avatar relation-avatar"><Link2 size={20} /></div>
       <div className="inspector-heading"><span>{relationTitle(relation.kind)}</span><h2>{source?.name} <b>→</b> {target}</h2></div>
-      <button className="icon-button" onClick={onClose} aria-label="Fermer"><X size={18} /></button>
+      <button className="icon-button" onClick={onClose} aria-label="Close"><X size={18} /></button>
     </header>
     <div className="inspector-body">
       <section className="inspector-section">
-        <div className="section-intro"><h3>Rôle de la connexion</h3><p>{relationDescription(relation.kind)}</p></div>
+        <div className="section-intro"><h3>Connection role</h3><p>{relationDescription(relation.kind)}</p></div>
         <div className="relation-summary-card">
-          <span>Origine</span>
-          <strong>{relation.inherited ? "Héritée de la configuration globale" : "Définie sur l’agent source"}</strong>
-          <small>{relation.explicit ? "Règle explicite" : "Règle effective calculée"}</small>
+          <span>Origin</span>
+          <strong>{relation.inherited ? "Inherited from global configuration" : "Defined on the source agent"}</strong>
+          <small>{relation.explicit ? "Explicit rule" : "Computed effective rule"}</small>
         </div>
-        {relation.kind !== "model" ? <label className="field"><span>Comportement</span><ActionSelect value={relation.inherited ? "inherit" : relation.action} onChange={onChange} /></label> : <div className="relation-summary-card"><span>Modèle effectif</span><strong>{relation.target}</strong><small>{inheritedModel ? "Choisi dans la configuration globale" : "Surcharge propre à l’agent"}</small></div>}
-        <div className="technical-note"><code>{technicalMapping(relation)}</code><span>Configuration OpenCode générée automatiquement</span></div>
+        {relation.kind !== "model" ? <label className="field"><span>Behavior</span><ActionSelect value={relation.inherited ? "inherit" : relation.action} onChange={onChange} /></label> : <div className="relation-summary-card"><span>Effective model</span><strong>{relation.target}</strong><small>{inheritedModel ? "Chosen in global configuration" : "Agent-specific override"}</small></div>}
+        <div className="technical-note"><code>{technicalMapping(relation)}</code><span>Automatically generated OpenCode configuration</span></div>
       </section>
     </div>
     <footer className="inspector-footer">
       <div className="inspector-actions">
-        <button className="button danger-outline" disabled={inheritedModel} onClick={onDelete}><Trash2 size={15} />{relation.inherited && relation.kind !== "model" ? "Bloquer cette connexion" : "Supprimer la connexion"}</button>
-        <button className="button" onClick={onClose}>Fermer</button>
+        <button className="button danger-outline" disabled={inheritedModel} onClick={onDelete}><Trash2 size={15} />{relation.inherited && relation.kind !== "model" ? "Block this connection" : "Delete connection"}</button>
+        <button className="button" onClick={onClose}>Close</button>
       </div>
     </footer>
   </aside>;
 }
 
 function relationTitle(kind: TeamRelation["kind"]): string {
-  return kind === "task" ? "Délégation" : kind === "skill" ? "Accès à un skill" : kind === "mcp" ? "Accès à un MCP" : kind === "tool" ? "Permission d’outil" : "Modèle";
+  return kind === "task" ? "Delegation" : kind === "skill" ? "Skill access" : kind === "mcp" ? "MCP access" : kind === "tool" ? "Tool permission" : "Model";
 }
 function relationDescription(kind: TeamRelation["kind"]): string {
-  return kind === "task" ? "L’agent source peut invoquer le sous-agent cible avec l’outil task."
-    : kind === "skill" ? "Le skill devient visible et chargeable par cet agent."
-      : kind === "mcp" ? "Les outils exposés par ce serveur MCP deviennent accessibles à l’agent."
-        : kind === "tool" ? "Cette règle contrôle directement l’utilisation de l’outil natif."
-          : "Cette connexion représente le modèle effectivement utilisé par l’agent.";
+  return kind === "task" ? "The source agent can invoke the target sub-agent with the task tool."
+    : kind === "skill" ? "The skill becomes visible and loadable by this agent."
+      : kind === "mcp" ? "The tools exposed by this MCP server become accessible to the agent."
+        : kind === "tool" ? "This rule directly controls the use of the native tool."
+          : "This connection represents the model effectively used by the agent.";
 }
 function technicalMapping(relation: TeamRelation): string {
   if (relation.kind === "model") return `agent.${relation.source}.model = ${relation.target}`;
-  if (relation.kind === "mcp") return `permission[\"${relation.target}_*\"]`;
+  if (relation.kind === "mcp") return `permission["${relation.target}_*"]`;
   return `permission.${relation.kind}.${relation.target}`;
 }

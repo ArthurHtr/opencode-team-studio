@@ -7,12 +7,9 @@ FROM node:22-bookworm-slim AS dependencies
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
+COPY package.json package-lock.json .npmrc ./
 
-COPY package.json pnpm-lock.yaml ./
-
-RUN pnpm install --frozen-lockfile --prod=false && \
-    pnpm prune --prod
+RUN npm ci --no-audit --no-fund
 
 # ---------------------------------------------------------------------------
 # Stage 2: Builder — compile the application
@@ -23,12 +20,10 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable && corepack prepare pnpm@10.12.1 --activate
-
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
-RUN pnpm run build
+RUN npm run build
 
 # ---------------------------------------------------------------------------
 # Stage 3: Runner — minimal production image
@@ -43,8 +38,7 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV HOME=/tmp
 
-RUN corepack enable && \
-    groupadd -r appuser && \
+RUN groupadd -r appuser && \
     useradd -r -g appuser -d /app -s /sbin/nologin appuser
 
 COPY --from=builder /app/public ./public

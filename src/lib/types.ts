@@ -72,10 +72,20 @@ export type GraphViewport = { x: number; y: number; zoom: number };
 export type GraphLayout = {
   positions: Record<string, GraphPosition>;
   viewport?: GraphViewport;
+  /** Nodes explicitly placed from the visual resource palette for this view. */
+  pinnedNodeIds?: string[];
 };
 export type StudioLayout = {
   version: 2;
   views: Record<string, GraphLayout>;
+};
+
+/**
+ * Reserved for Studio-only metadata. Version 2 intentionally contains no
+ * visual clusters. Older cluster fields are ignored when they are read.
+ */
+export type StudioMetadata = {
+  version: 2;
 };
 
 export type BackupSummary = {
@@ -95,6 +105,7 @@ export type TeamSnapshot = {
   defaultAgent: string;
   defaultModel?: string;
   layout: StudioLayout;
+  metadata: StudioMetadata;
   latestBackup?: BackupSummary;
 };
 
@@ -111,6 +122,7 @@ export type TeamRelation = {
 export type TeamApplyInput = {
   snapshot: TeamSnapshot;
   layout: StudioLayout;
+  metadata: StudioMetadata;
   reason?: string;
 };
 
@@ -141,4 +153,8 @@ export type TeamNodeData = {
   count?: number;
   color?: string;
   status?: PermissionAction | "inherit";
+  /** True when the node was explicitly placed from the palette in this view. */
+  pinned?: boolean;
+  /** True when a palette node is visible but not yet linked to the current graph. */
+  unlinked?: boolean;
 };

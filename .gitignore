@@ -1,55 +1,8 @@
-# Dependencies
-node_modules
-.pnp
-.pnp.js
-
-# Build
-.next
-out
-dist
-build
-
-# Testing
-coverage
-.turbo
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# Environment
+node_modules/
+.next/
+out/
 .env
-.env.local
-.env.production
-.env.*.local
-
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Logs
-*.log
+.env.*
+!.env.example
 npm-debug.log*
-pnpm-debug.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Backups and studio data
-backups/
-studio-data/
-.studio-apply-*
-
-# Archives
-*.tar.gz
-*.zip
-*.rar
-
-# Temporary
-*.tmp
-*.temp
+*.tsbuildinfo

@@ -37,5 +37,9 @@ next-env.d.ts
 .vscode
 .idea
 .DS_Store
-coverage
 pnpm-debug.log*
+Dockerfile
+Dockerfile.*
+docker-compose*.yaml
+docker-compose*.yml
+COMPOSE

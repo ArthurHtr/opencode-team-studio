@@ -1,6 +1,0 @@
-services:
-  studio:
-    build: .
-    extends:
-      file: compose.yaml
-      service: studio
