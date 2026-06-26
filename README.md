@@ -1,4 +1,4 @@
-<p align="center"> <img src="docs/assets/opencode-team-studio-hero.webp" alt="OpenCode Team Studio — Visual workspace for OpenCode agent teams" width="100%" /> </p>
+<p align="center"> <img src="docs/assets/opencode-team-studio.webp" alt="OpenCode Team Studio — Visual workspace for OpenCode agent teams" width="100%" /> </p>
 
 # OpenCode Team Studio
 
