@@ -40,9 +40,6 @@ function isSensitiveKey(key: string): boolean {
  * Validates an environment variable name: must start with A-Z or _,
  * followed by A-Z, 0-9, or _.
  */
-// ENV_VAR_NAME_RE — validated at input time in the env-ref field
-const _ENV_VAR_NAME_RE = /^[A-Z_][A-Z0-9_]*$/;
-
 export function TypedObjectEditor({
   value,
   onChange,

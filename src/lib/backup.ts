@@ -17,9 +17,6 @@ const EXCLUDED = new Set([
   "secrets",
 ]);
 
-/** Patterns for directories that look like stale studio backups. */
-const STALE_BACKUP_PREFIX = "studio.backup-";
-
 /** Maximum number of backups to keep. Older ones are pruned automatically. */
 const MAX_BACKUPS = 5;
 

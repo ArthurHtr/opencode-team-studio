@@ -101,7 +101,6 @@ export function TeamStudio({ initial }: { initial: TeamSnapshot }) {
 }
 
 function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
-  const [savedSnapshot, setSavedSnapshot] = useState<TeamSnapshot | null>(null);
   const [draftSnapshot, setDraftSnapshot] = useState<TeamSnapshot | null>(null);
   const [layout, setLayout] = useState<StudioLayout>(initial.layout || EMPTY_LAYOUT);
   const [view, setView] = useState<TeamView>("organization");
@@ -115,7 +114,8 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
   const [newAgentOpen, setNewAgentOpen] = useState(false);
   const [status, setStatus] = useState<EditorStatus>("loading");
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+   useEffect(() => { setMounted(true); }, []);
   const [layingOut, setLayingOut] = useState(false);
   const [flowReady, setFlowReady] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -219,7 +219,7 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
     } finally {
       if (request === graphRequestRef.current) setLayingOut(false);
     }
-  }, [filters, flow, selectedAgent, selectedResource, setEdges, setNodes, storeViewLayout, view]);
+  }, [filters, selectedAgent, selectedResource, setEdges, setNodes, storeViewLayout, view]);
 
   // Unified reload function — used for initial load and "Relire" button
   async function reloadFromDisk(options: { silent: boolean; confirmDiscard: boolean }) {
@@ -234,7 +234,6 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
       const result = await response.json() as TeamSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error || "Reload failed");
 
-      setSavedSnapshot(result);
       setDraftSnapshot(JSON.parse(JSON.stringify(result)));
       draftRef.current = result;
       layoutRef.current = result.layout;
@@ -257,13 +256,17 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
   }
 
   // Initial load — call reloadFromDisk once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reloadFromDisk({ silent: true, confirmDiscard: false });
   }, []);
 
   // Reconstruction effect — depends on graphRevision, NOT on draftSnapshot
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!flowReady || !draftSnapshot) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void buildGraph();
   }, [buildGraph, flowReady, graphRevision, view, selectedAgent, selectedResource, filters]);
 
@@ -576,7 +579,6 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
       const result = await response.json() as TeamSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error || "Save failed");
 
-      setSavedSnapshot(result);
       setDraftSnapshot(JSON.parse(JSON.stringify(result)));
       draftRef.current = result;
       layoutRef.current = result.layout;
@@ -597,11 +599,6 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
     setMessage("");
     setError("");
   }
-
-  const statusLabel = status === "loading" ? "Loading configuration…"
-    : status === "saving" ? "Saving…"
-    : status === "error" ? "Error"
-    : "Ready";
 
   return (
     <div className={`team-workspace ${hasInspector ? "with-inspector" : ""}`}>
