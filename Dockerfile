@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Dependencies — resolve production dependencies
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS dependencies
+FROM node:26-bookworm-slim AS dependencies
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npm ci --no-audit --no-fund
 # ---------------------------------------------------------------------------
 # Stage 2: Builder — compile the application
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS builder
+FROM node:26-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 3: Runner — minimal production image
 # ---------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 
 WORKDIR /app
 
