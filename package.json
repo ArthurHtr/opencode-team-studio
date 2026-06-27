@@ -1,6 +1,6 @@
 {
   "name": "opencode-team-studio",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.0-alpha.2",
   "private": true,
   "description": "A visual workspace for designing, configuring, and managing OpenCode agent teams.",
   "packageManager": "npm@10.0.0",

@@ -1,6 +1,6 @@
 services:
   studio:
-    image: ghcr.io/arthurhtr/opencode-team-studio:${STUDIO_VERSION:-v0.2.0-alpha.1}
+    image: ghcr.io/arthurhtr/opencode-team-studio:${STUDIO_VERSION:-v0.2.0-alpha.2}
     container_name: opencode-team-studio
     restart: unless-stopped
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"

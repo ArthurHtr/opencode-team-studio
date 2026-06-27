@@ -69,7 +69,7 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
-  ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.1
+ ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2
 ```
 
 Then open: `http://127.0.0.1:3210`
@@ -81,7 +81,7 @@ Then open: `http://127.0.0.1:3210`
 ```yaml
 services:
   studio:
-    image: ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.1
+    image: ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2
     container_name: opencode-team-studio
     restart: unless-stopped
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
@@ -145,9 +145,9 @@ See the [Migration guide](#migration-from-v01) below for details on upgrading fr
 
 The current public version is:
 
-- `v0.2.0-alpha.1`
+- `v0.2.0-alpha.2`
 - Status: alpha pre-release
-- Container: `ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.1`
+- Container: `ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2`
 
 See all published versions in the [GitHub Releases](https://github.com/ArthurHtr/opencode-team-studio/releases) page.
 

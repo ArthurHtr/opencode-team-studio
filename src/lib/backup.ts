@@ -5,7 +5,7 @@ import path from "node:path";
 import { getConfigRoot } from "@/lib/env";
 import type { BackupSummary } from "@/lib/types";
 
-const BACKUP_DIRNAME = "backups";
+const BACKUP_DIRNAME = "backups-config";
 
 /** Items excluded from backups. Kept small and explicit. */
 const EXCLUDED = new Set([
