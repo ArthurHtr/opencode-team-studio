@@ -158,3 +158,138 @@ export type TeamNodeData = {
   /** True when a palette node is visible but not yet linked to the current graph. */
   unlinked?: boolean;
 };
+
+// ─── Team profile types ───────────────────────────────────────────────────────
+
+export type TeamId = string;
+
+export type TeamConfigFormat = "opencode.json" | "opencode.jsonc";
+
+export interface StoredTeam {
+  id: TeamId;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  configFilename: TeamConfigFormat;
+}
+
+export interface TeamsRegistry {
+  version: 1 | number;
+  activeTeamId: TeamId;
+  teams: StoredTeam[];
+}
+
+export interface TeamListItem extends StoredTeam {
+  active: boolean;
+  agentCount: number;
+  defaultAgent?: string;
+  defaultModel?: string;
+  revisionCount: number;
+}
+
+export interface TeamManifest {
+  version: 1;
+  teamId: TeamId;
+  configFilename: TeamConfigFormat;
+  createdAt: string;
+  lastMaterializedAt?: string;
+  lastMaterializedHash?: string;
+}
+
+export type TeamRevisionKind = "automatic" | "manual";
+
+export type TeamRevisionReason =
+  | "before-save"
+  | "before-switch"
+  | "before-restore"
+  | "before-destructive-operation"
+  | "manual";
+
+export interface TeamRevisionManifest {
+  version: 1;
+  id: string;
+  teamId: TeamId;
+  createdAt: string;
+  kind: TeamRevisionKind;
+  reason: TeamRevisionReason;
+  label?: string;
+  description?: string;
+  configFilename: TeamConfigFormat;
+  contentHash: string;
+  agentCount?: number;
+}
+
+export interface TeamRevision {
+  id: string;
+  teamId: TeamId;
+  createdAt: string;
+  kind?: TeamRevisionKind;
+  reason?: TeamRevisionReason;
+  label?: string;
+  description?: string;
+  configFilename: TeamConfigFormat;
+  hash?: string;
+  contentHash?: string;
+  agentCount?: number;
+}
+
+export interface RevisionPreview {
+  currentAgentCount: number;
+  selectedAgentCount: number;
+  addedAgents: string[];
+  removedAgents: string[];
+  modifiedAgents: string[];
+  defaultAgentChanged: boolean;
+  currentDefaultAgent: string;
+  selectedDefaultAgent: string;
+  formatChanged: boolean;
+  currentFormat: string;
+  selectedFormat: string;
+  mcpCountChanged: boolean;
+  currentMcpCount: number;
+  selectedMcpCount: number;
+}
+
+export interface TransactionSnapshot {
+  id: string;
+  createdAt: string;
+  status: "pending" | "completed" | "abandoned";
+  reason: string;
+  activeTeamId: string;
+  configFilename: string;
+  configContent: string;
+  agentCount: number;
+}
+
+export interface TeamRenameRevisionInput {
+  label?: string;
+  description?: string;
+}
+
+export interface TeamCreateManualRevisionInput {
+  kind: "manual";
+  label: string;
+  description?: string;
+}
+
+export interface TeamActivationInput {
+  mode: "empty" | "duplicate-active" | "duplicate-team";
+  name: string;
+  description?: string;
+  sourceTeamId?: TeamId;
+}
+
+export interface TeamRenameInput {
+  name: string;
+}
+
+export interface TeamDuplicateInput {
+  name: string;
+  sourceTeamId: TeamId;
+}
+
+export interface TeamRestoreRevisionInput {
+  revisionId: string;
+  reason?: string;
+}

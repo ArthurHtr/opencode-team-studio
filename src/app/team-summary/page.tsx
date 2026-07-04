@@ -1,3 +1,7 @@
-import { TeamSummaryPage } from "@/components/team-summary/team-summary-page";
+import { redirect } from "next/navigation";
+
 export const dynamic = "force-dynamic";
-export default function TeamSummaryRoute() { return <TeamSummaryPage />; }
+
+export default function TeamSummaryRedirect() {
+  redirect("/my-teams");
+}

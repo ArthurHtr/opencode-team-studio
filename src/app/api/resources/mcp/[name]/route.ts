@@ -10,4 +10,4 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ name: s
   try { const { name } = await params; await deleteMcp(decodeURIComponent(name)); return NextResponse.json({ ok: true }); }
   catch (error) { return NextResponse.json({ error: message(error) }, { status: 400 }); }
 }
-function message(error: unknown) { return error instanceof Error ? error.message : "Erreur inconnue"; }
+function message(error: unknown) { return error instanceof Error ? error.message : "Unknown error"; }

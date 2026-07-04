@@ -1,10 +1,8 @@
 {
   "name": "opencode-team-studio",
-  "version": "0.2.0-alpha.2",
+  "version": "1.0.0",
   "private": true,
-  "description": "A visual workspace for designing, configuring, and managing OpenCode agent teams.",
-  "packageManager": "npm@10.0.0",
-  "author": "Arthur Hottier",
+  "description": "A visual workspace for designing, configuring, and managing OpenCode agent teams with multi-team profiles, revisions, and transactional backups.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/ArthurHtr/opencode-team-studio",
   "repository": {

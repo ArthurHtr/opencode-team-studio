@@ -17,6 +17,9 @@ const EXCLUDED = new Set([
   "secrets",
 ]);
 
+/** Patterns for directories that look like stale studio backups. */
+const STALE_BACKUP_PREFIX = "studio.backup-";
+
 /** Maximum number of backups to keep. Older ones are pruned automatically. */
 const MAX_BACKUPS = 5;
 
@@ -55,11 +58,13 @@ export async function createConfigBackup(reason: string): Promise<BackupSummary>
     });
   }
 
+  const sizeBytes = await calcDirSize(target);
   const summary: BackupSummary = {
     id,
     path: path.relative(root, target),
     createdAt: createdAt.toISOString(),
     reason,
+    sizeBytes,
   };
   await writeFile(path.join(target, "BACKUP_INFO.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
   await ensureLocalDataIgnored(root);
@@ -144,7 +149,7 @@ async function ensureLocalDataIgnored(root: string): Promise<void> {
   const gitignore = path.join(root, ".gitignore");
   let content = "";
   try { content = await readFile(gitignore, "utf8"); } catch { /* created below */ }
-  const missing = ["backups/", "studio-data/"].filter((rule) => !content.split(/\r?\n/).includes(rule));
+  const missing = ["backups-config/", "studio-data/"].filter((rule) => !content.split(/\r?\n/).includes(rule));
   if (!missing.length) return;
   const prefix = content && !content.endsWith("\n") ? "\n" : "";
   await appendFile(gitignore, `${prefix}\n# OpenCode Team Studio local data\n${missing.join("\n")}\n`, "utf8");
@@ -156,4 +161,18 @@ function validateBackupId(id: string): void {
 
 function timestampId(date: Date): string {
   return date.toISOString().replace(/[:.]/g, "-");
+}
+
+async function calcDirSize(dir: string): Promise<number> {
+  let total = 0;
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      total += await calcDirSize(full);
+    } else {
+      try { total += (await stat(full)).size; } catch { /* ignore unreadable files */ }
+    }
+  }
+  return total;
 }

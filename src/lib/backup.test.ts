@@ -77,4 +77,11 @@ describe("backups transactionnels", () => {
       expect(allBackups[i].id).toBe(backups[backups.length - 1 - i].id);
     }
   });
+
+  it("calcule la taille du backup", async () => {
+    const backup = await createConfigBackup("size");
+    expect(backup.sizeBytes).toBeGreaterThan(0);
+    const allBackups = await import("@/lib/backup").then((m) => m.listConfigBackups());
+    expect(allBackups[0].sizeBytes).toBeGreaterThan(0);
+  });
 });

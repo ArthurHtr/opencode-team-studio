@@ -21,17 +21,17 @@ function PermissionCard({ tool, value, onChange }: { tool: typeof NATIVE_TOOLS[n
     <div className="permission-card-head"><div><strong>{tool.label}</strong><p>{tool.description}</p></div><select value={mode} onChange={(event) => {
       const next = event.target.value as PermissionChoice | "rules";
       if (next === "inherit") onChange(undefined); else if (next === "rules") onChange({ "*": "ask" }); else onChange(next);
-    }}><option value="inherit">Hériter</option><option value="allow">Autoriser</option><option value="ask">Demander</option><option value="deny">Refuser</option><option value="rules">Règles détaillées</option></select></div>
+    }}><option value="inherit">Inherit</option><option value="allow">Allow</option><option value="ask">Ask</option><option value="deny">Deny</option><option value="rules">Detailed rules</option></select></div>
     {mode === "rules" ? <div className="rule-list">
       {rules.map(([pattern, action], index) => <div className="rule-row" key={`${pattern}-${index}`}>
-        <input value={pattern} placeholder="Motif, ex. git status*" onChange={(event) => updateRule(index, event.target.value, action)} />
+        <input value={pattern} placeholder="Pattern, e.g. git status*" onChange={(event) => updateRule(index, event.target.value, action)} />
         <ActionSelect compact value={action} onChange={(next) => next !== "inherit" && updateRule(index, pattern, next)} />
         <button type="button" className="icon-button" disabled={index === 0} onClick={() => move(index, -1)}><ArrowUp size={14} /></button>
         <button type="button" className="icon-button" disabled={index === rules.length - 1} onClick={() => move(index, 1)}><ArrowDown size={14} /></button>
         <button type="button" className="icon-button danger" onClick={() => replace(rules.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button>
       </div>)}
-      <button type="button" className="button subtle" onClick={() => replace([...rules, ["", "ask"]])}><Plus size={14} /> Ajouter une règle</button>
-      <small>Les règles sont évaluées de haut en bas ; la dernière règle correspondante gagne.</small>
+      <button type="button" className="button subtle" onClick={() => replace([...rules, ["", "ask"]])}><Plus size={14} /> Add rule</button>
+      <small>Rules are evaluated top to bottom; the last matching rule wins.</small>
     </div> : null}
   </article>;
 

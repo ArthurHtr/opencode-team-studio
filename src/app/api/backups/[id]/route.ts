@@ -12,4 +12,4 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: message(error) }, { status: 400 });
   }
 }
-function message(error: unknown) { return error instanceof Error ? error.message : "Erreur inconnue"; }
+function message(error: unknown) { return error instanceof Error ? error.message : "Unknown error"; }

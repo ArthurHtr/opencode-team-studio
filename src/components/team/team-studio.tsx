@@ -28,11 +28,13 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  Settings2,
   SlidersHorizontal,
   Sparkles,
   Workflow,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { AgentInspector } from "@/components/team/agent-inspector";
 import { NewAgentDialog } from "@/components/team/new-agent-dialog";
@@ -101,6 +103,7 @@ export function TeamStudio({ initial }: { initial: TeamSnapshot }) {
 }
 
 function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
+  const [savedSnapshot, setSavedSnapshot] = useState<TeamSnapshot | null>(null);
   const [draftSnapshot, setDraftSnapshot] = useState<TeamSnapshot | null>(null);
   const [layout, setLayout] = useState<StudioLayout>(initial.layout || EMPTY_LAYOUT);
   const [view, setView] = useState<TeamView>("organization");
@@ -114,14 +117,27 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
   const [newAgentOpen, setNewAgentOpen] = useState(false);
   const [status, setStatus] = useState<EditorStatus>("loading");
   const [mounted, setMounted] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { setMounted(true); }, []);
+
+  // Fetch active team name
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/teams", { cache: "no-store" });
+        const result = await response.json() as (import("@/lib/types").TeamListItem & { error?: string })[];
+        if (!response.ok) return;
+        const active = result.find((t) => t.active);
+        if (active) setActiveTeamName(active.name);
+      } catch { /* ignore */ }
+    })();
+  }, []);
   const [layingOut, setLayingOut] = useState(false);
   const [flowReady, setFlowReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [graphRevision, setGraphRevision] = useState(0);
+  const [activeTeamName, setActiveTeamName] = useState<string | undefined>();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TeamNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<TeamRelation>>([]);
   const flow = useReactFlow<Node<TeamNodeData>, Edge<TeamRelation>>();
@@ -219,7 +235,7 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
     } finally {
       if (request === graphRequestRef.current) setLayingOut(false);
     }
-  }, [filters, selectedAgent, selectedResource, setEdges, setNodes, storeViewLayout, view]);
+  }, [filters, flow, selectedAgent, selectedResource, setEdges, setNodes, storeViewLayout, view]);
 
   // Unified reload function — used for initial load and "Relire" button
   async function reloadFromDisk(options: { silent: boolean; confirmDiscard: boolean }) {
@@ -234,6 +250,7 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
       const result = await response.json() as TeamSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error || "Reload failed");
 
+      setSavedSnapshot(result);
       setDraftSnapshot(JSON.parse(JSON.stringify(result)));
       draftRef.current = result;
       layoutRef.current = result.layout;
@@ -256,17 +273,13 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
   }
 
   // Initial load — call reloadFromDisk once on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void reloadFromDisk({ silent: true, confirmDiscard: false });
   }, []);
 
   // Reconstruction effect — depends on graphRevision, NOT on draftSnapshot
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!flowReady || !draftSnapshot) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void buildGraph();
   }, [buildGraph, flowReady, graphRevision, view, selectedAgent, selectedResource, filters]);
 
@@ -579,6 +592,7 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
       const result = await response.json() as TeamSnapshot & { error?: string };
       if (!response.ok) throw new Error(result.error || "Save failed");
 
+      setSavedSnapshot(result);
       setDraftSnapshot(JSON.parse(JSON.stringify(result)));
       draftRef.current = result;
       layoutRef.current = result.layout;
@@ -600,6 +614,11 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
     setError("");
   }
 
+  const statusLabel = status === "loading" ? "Loading configuration…"
+    : status === "saving" ? "Saving…"
+    : status === "error" ? "Error"
+    : "Ready";
+
   return (
     <div className={`team-workspace ${hasInspector ? "with-inspector" : ""}`}>
       <section className="canvas-shell">
@@ -609,8 +628,10 @@ function TeamStudioInner({ initial }: { initial: TeamSnapshot }) {
             <span className="eyebrow">OpenCode Visual Cockpit</span>
              <h1>My agent team</h1>
              <p>Move members, connect their capabilities, and configure their autonomy. The Studio generates OpenCode configuration when you save.</p>
+             {activeTeamName ? <span className="active-team-label">Active team: {activeTeamName}</span> : null}
             </div>
            <div className="toolbar-actions">
+           <Link href="/my-teams" className="button" style={{ marginRight: 4 }}><Settings2 size={15} />Teams</Link>
           <button className="button" type="button" onClick={() => void reloadFromDisk({ silent: false, confirmDiscard: true })} disabled={mounted && !!(status === "loading" || status === "saving")}><RefreshCw size={15} />Reload</button>
              <button className="button" type="button" onClick={() => void reorganize()} disabled={mounted && !!(layingOut || status === "loading" || status === "saving")}><Sparkles size={15} />Reorganize</button>
              <button className="button" type="button" onClick={() => setNewAgentOpen(true)} disabled={mounted && !!(status === "loading" || status === "saving")}><Plus size={16} />New agent</button>

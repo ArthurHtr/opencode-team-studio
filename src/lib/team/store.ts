@@ -4,7 +4,10 @@ import { mkdir, readdir } from "node:fs/promises";
 import YAML from "yaml";
 import { getConfigDocument, updateConfigPath, updateConfigPaths } from "@/lib/config-store";
 import { atomicWrite, exists, readUtf8, removePath, safeConfigPath } from "@/lib/filesystem";
-import { getLatestBackup, withConfigTransaction } from "@/lib/backup";
+import { getLatestBackup } from "@/lib/backup";
+import { createAutomaticRevision, createManualRevision } from "@/lib/teams/revisions";
+import { synchronizeActiveRuntimeToProfile } from "@/lib/teams/storage";
+import { getActiveTeam } from "@/lib/teams/registry";
 import { getStudioLayout, saveStudioLayout } from "@/lib/layout-store";
 import { getStudioMetadata, saveStudioMetadata } from "@/lib/metadata-store";
 import type {
@@ -69,53 +72,67 @@ export async function getAgent(name: string): Promise<AgentDefinition> {
 
 export async function applyTeamDraft(input: TeamApplyInput): Promise<TeamSnapshot> {
   validateTeamDraft(input.snapshot);
-  return withConfigTransaction(input.reason || "Sauvegarde de l’équipe", async () => {
-    const current = await getTeamSnapshot();
-    const configuredAgents: Record<string, unknown> = {};
-    const desiredFileAgents = new Map<string, AgentDefinition>();
+  const current = await getTeamSnapshot();
+  const configuredAgents: Record<string, unknown> = {};
+  const desiredFileAgents = new Map<string, AgentDefinition>();
 
-    for (const agent of input.snapshot.agents) {
-      validateAgentName(agent.name);
-      if (agent.source === "file" && !agent.builtin) desiredFileAgents.set(agent.name, agent);
-      else configuredAgents[agent.name] = serializeAgentConfig(agent, true);
+  for (const agent of input.snapshot.agents) {
+    validateAgentName(agent.name);
+    if (agent.source === "file" && !agent.builtin) desiredFileAgents.set(agent.name, agent);
+    else configuredAgents[agent.name] = serializeAgentConfig(agent, true);
+  }
+
+  await updateConfigPaths([
+    { path: ["$schema"], value: "https://opencode.ai/config.json" },
+    { path: ["agent"], value: configuredAgents },
+    { path: ["mcp"], value: Object.fromEntries(input.snapshot.mcps.map((mcp) => [mcp.name, serializeMcp(mcp)])) },
+    { path: ["permission"], value: input.snapshot.globalPermission },
+    { path: ["default_agent"], value: input.snapshot.defaultAgent },
+    { path: ["model"], value: input.snapshot.defaultModel },
+  ]);
+
+  const agentsDirectory = safeConfigPath("agents");
+  await mkdir(agentsDirectory, { recursive: true });
+  for (const agent of desiredFileAgents.values()) {
+    await atomicWrite(agentFile(agent.name), serializeAgentMarkdown(agent));
+  }
+
+  for (const previous of current.agents) {
+    if (previous.source !== "file" || previous.builtin) continue;
+    if (!desiredFileAgents.has(previous.name)) await removePath(agentFile(previous.name));
+  }
+
+  const normalizedLayout = normalizeLayout(input.layout);
+  const normalizedMetadata = normalizeMetadata(input.metadata, input.snapshot.agents.map((agent) => agent.name));
+  await Promise.all([saveStudioLayout(normalizedLayout), saveStudioMetadata(normalizedMetadata)]);
+
+  const verified = await getTeamSnapshot();
+  verifyAppliedSnapshot(input.snapshot, verified);
+
+  // Create team revision instead of global backup
+  const activeTeam = await getActiveTeam();
+  if (activeTeam) {
+    try {
+      await synchronizeActiveRuntimeToProfile();
+      if (input.reason && input.reason !== "Team backup") {
+        await createManualRevision(activeTeam.id, { kind: "manual", label: input.reason });
+      } else {
+        await createAutomaticRevision(activeTeam.id, "before-save");
+      }
+    } catch {
+      // Non-fatal: revision creation failure doesn't invalidate the save
     }
+  }
 
-    await updateConfigPaths([
-      { path: ["$schema"], value: "https://opencode.ai/config.json" },
-      { path: ["agent"], value: configuredAgents },
-      { path: ["mcp"], value: Object.fromEntries(input.snapshot.mcps.map((mcp) => [mcp.name, serializeMcp(mcp)])) },
-      { path: ["permission"], value: input.snapshot.globalPermission },
-      { path: ["default_agent"], value: input.snapshot.defaultAgent },
-      { path: ["model"], value: input.snapshot.defaultModel },
-    ]);
-
-    const agentsDirectory = safeConfigPath("agents");
-    await mkdir(agentsDirectory, { recursive: true });
-    for (const agent of desiredFileAgents.values()) {
-      await atomicWrite(agentFile(agent.name), serializeAgentMarkdown(agent));
-    }
-
-    for (const previous of current.agents) {
-      if (previous.source !== "file" || previous.builtin) continue;
-      if (!desiredFileAgents.has(previous.name)) await removePath(agentFile(previous.name));
-    }
-
-    const normalizedLayout = normalizeLayout(input.layout);
-    const normalizedMetadata = normalizeMetadata(input.metadata, input.snapshot.agents.map((agent) => agent.name));
-    await Promise.all([saveStudioLayout(normalizedLayout), saveStudioMetadata(normalizedMetadata)]);
-
-    const verified = await getTeamSnapshot();
-    verifyAppliedSnapshot(input.snapshot, verified);
-    return verified;
-  });
+  return verified;
 }
 
 export async function saveAgent(agent: AgentDefinition, originalName?: string): Promise<AgentDefinition> {
-  return withConfigTransaction(`Modification de l’agent ${originalName || agent.name}`, () => saveAgentRaw(agent, originalName));
+  return saveAgentRaw(agent, originalName);
 }
 
 export async function createAgent(input: Pick<AgentDefinition, "name" | "description" | "mode"> & { preset?: string }): Promise<AgentDefinition> {
-  return withConfigTransaction(`Création de l’agent ${input.name}`, async () => {
+  return (async () => {
     validateAgentName(input.name);
     const target = agentFile(input.name);
     if (await exists(target)) throw new Error("An agent already has this name");
@@ -133,62 +150,50 @@ export async function createAgent(input: Pick<AgentDefinition, "name" | "descrip
     };
     await atomicWrite(target, serializeAgentMarkdown(agent));
     return getAgent(input.name);
-  });
+  })();
 }
 
 export async function deleteAgent(name: string): Promise<void> {
-  await withConfigTransaction(`Suppression de l’agent ${name}`, async () => {
-    const agent = await getAgent(name);
-    if (agent.builtin || agent.source === "config") await updateConfigPath(["agent", name], undefined);
-    else await removePath(agentFile(name));
-  });
+  const agent = await getAgent(name);
+  if (agent.builtin || agent.source === "config") await updateConfigPath(["agent", name], undefined);
+  else await removePath(agentFile(name));
 }
 
 export async function saveAgentPermission(name: string, permission: PermissionConfig): Promise<AgentDefinition> {
-  return withConfigTransaction(`Permission modification for ${name}`, async () => {
-    const agent = await getAgent(name);
-    return saveAgentRaw({ ...agent, permission }, name);
-  });
+  const agent = await getAgent(name);
+  return saveAgentRaw({ ...agent, permission }, name);
 }
 
 export async function saveSkill(skill: SkillDefinition, originalName?: string): Promise<SkillDefinition> {
-  return withConfigTransaction(`Skill modification ${originalName || skill.name}`, async () => {
-    validateSkillName(skill.name);
-    if (!skill.description.trim()) throw new Error("The skill description is required");
-    const target = skillFile(skill.name);
-    if (originalName && originalName !== skill.name && await exists(target)) throw new Error("A skill already has this name");
-    const frontmatter: Record<string, unknown> = { name: skill.name, description: skill.description };
-    if (skill.license) frontmatter.license = skill.license;
-    if (skill.compatibility) frontmatter.compatibility = skill.compatibility;
-    if (Object.keys(skill.metadata).length) frontmatter.metadata = skill.metadata;
-    await atomicWrite(target, stringifyFrontmatter(frontmatter, skill.body));
-    if (originalName && originalName !== skill.name) await removePath(skillDirectory(originalName));
-    return readSkill(skill.name);
-  });
+  validateSkillName(skill.name);
+  if (!skill.description.trim()) throw new Error("The skill description is required");
+  const target = skillFile(skill.name);
+  if (originalName && originalName !== skill.name && await exists(target)) throw new Error("A skill already has this name");
+  const frontmatter: Record<string, unknown> = { name: skill.name, description: skill.description };
+  if (skill.license) frontmatter.license = skill.license;
+  if (skill.compatibility) frontmatter.compatibility = skill.compatibility;
+  if (Object.keys(skill.metadata).length) frontmatter.metadata = skill.metadata;
+  await atomicWrite(target, stringifyFrontmatter(frontmatter, skill.body));
+  if (originalName && originalName !== skill.name) await removePath(skillDirectory(originalName));
+  return readSkill(skill.name);
 }
 
 export async function deleteSkill(name: string): Promise<void> {
-  await withConfigTransaction(`Skill deletion ${name}`, async () => {
-    validateSkillName(name);
-    await removePath(skillDirectory(name));
-  });
+  validateSkillName(name);
+  await removePath(skillDirectory(name));
 }
 
 export async function saveMcp(mcp: McpDefinition, originalName?: string): Promise<McpDefinition> {
-  return withConfigTransaction(`MCP modification ${originalName || mcp.name}`, async () => {
-    validateAgentName(mcp.name);
-    if (originalName && originalName !== mcp.name) await updateConfigPath(["mcp", originalName], undefined);
-    await updateConfigPath(["mcp", mcp.name], serializeMcp(mcp));
-    const saved = (await getTeamSnapshot()).mcps.find((item) => item.name === mcp.name);
-    if (!saved) throw new Error("MCP not registered");
-    return saved;
-  });
+  validateAgentName(mcp.name);
+  if (originalName && originalName !== mcp.name) await updateConfigPath(["mcp", originalName], undefined);
+  await updateConfigPath(["mcp", mcp.name], serializeMcp(mcp));
+  const saved = (await getTeamSnapshot()).mcps.find((item) => item.name === mcp.name);
+  if (!saved) throw new Error("MCP not registered");
+  return saved;
 }
 
 export async function deleteMcp(name: string): Promise<void> {
-  await withConfigTransaction(`MCP deletion ${name}`, async () => {
-    await updateConfigPath(["mcp", name], undefined);
-  });
+  await updateConfigPath(["mcp", name], undefined);
 }
 
 async function saveAgentRaw(agent: AgentDefinition, originalName?: string): Promise<AgentDefinition> {
@@ -402,10 +407,10 @@ function validateTeamDraft(snapshot: TeamSnapshot): void {
   const mcpNames = new Set<string>();
   for (const mcp of snapshot.mcps) {
     validateAgentName(mcp.name);
-    if (mcpNames.has(mcp.name)) throw new Error(`MCP dupliqué : ${mcp.name}`);
+    if (mcpNames.has(mcp.name)) throw new Error(`Duplicated MCP: ${mcp.name}`);
     mcpNames.add(mcp.name);
-    if (mcp.type === "local" && mcp.command.length === 0) throw new Error(`Le Local MCP ${mcp.name} doit avoir une commande`);
-    if (mcp.type === "remote" && !mcp.url) throw new Error(`Le Remote MCP ${mcp.name} doit avoir une URL`);
+    if (mcp.type === "local" && mcp.command.length === 0) throw new Error(`The Local MCP ${mcp.name} must have a command`);
+    if (mcp.type === "remote" && !mcp.url) throw new Error(`The Remote MCP ${mcp.name} must have a URL`);
   }
 }
 

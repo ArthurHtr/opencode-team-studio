@@ -11,4 +11,4 @@ export async function GET() {
   }
 }
 
-function message(error: unknown) { return error instanceof Error ? error.message : "Erreur inconnue"; }
+function message(error: unknown) { return error instanceof Error ? error.message : "Unknown error"; }

@@ -15,17 +15,17 @@ OpenCode Team Studio is an independent community project. It is not built, maint
 [![Release](https://img.shields.io/github/v/release/ArthurHtr/opencode-team-studio?include_prereleases&label=release)](https://github.com/ArthurHtr/opencode-team-studio/releases)
 [![License: Apache-2.0](https://img.shields.io/github/license/ArthurHtr/opencode-team-studio)](./LICENSE)
 [![GHCR](https://img.shields.io/badge/container-GHCR-blue)](https://github.com/users/ArthurHtr/packages/container/package/opencode-team-studio)
-[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange)](#status)
+[![Status: Stable](https://img.shields.io/badge/status-stable-brightgreen)](#status)
 
 ## Status
 
-> **OpenCode Team Studio is currently in alpha.**
+> **OpenCode Team Studio v1.0.0 is stable.**
 >
 > Back up your OpenCode configuration before use and review generated changes.
-> The configuration format may change between alpha versions.
 
 ## Features
 
+- **Multi-team profiles** — Manage multiple team configurations with activation, duplication, and revision history.
 - **Visual resource palette** — Search and drag agents, skills, and MCP servers onto the canvas.
 - **Drag-and-drop graph editing** — Place nodes freely on the React Flow canvas and connect them with semantic ports.
 - **Semantic connection ports** — Each node exposes type-specific handles: delegations, skills, MCP servers, native tools, and models.
@@ -35,6 +35,7 @@ OpenCode Team Studio is an independent community project. It is not built, maint
 - **Permission editor** — Fine-grained `allow`, `ask`, `deny` rules with inheritance for each agent.
 - **Model configuration** — Configure providers, models, variants, temperature, and top-p per agent.
 - **Transactional backups** — Full configuration backup before every apply, with automatic restore on failure.
+- **Revision history** — Automatic and manual revisions with content hashing and restoration.
 - **Restore workflow** — Browse, restore, and delete backups from the dedicated Backups page.
 - **Docker deployment** — Single-container local deployment with volume-mounted configuration.
 
@@ -69,19 +70,19 @@ docker run -d \
   -e OPENCODE_CONFIG_DIR=/config \
   -p 127.0.0.1:3210:3000 \
   -v "$HOME/.config/opencode:/config" \
- ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2
+ ghcr.io/arthurhtr/opencode-team-studio:v1.0.0
 ```
 
 Then open: `http://127.0.0.1:3210`
 
-> **Note:** No `latest` tag is published for alpha releases. Always use the explicit version tag.
+> **Note:** Always use the explicit version tag.
 
 ### Docker Compose
 
 ```yaml
 services:
   studio:
-    image: ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2
+    image: ghcr.io/arthurhtr/opencode-team-studio:v1.0.0
     container_name: opencode-team-studio
     restart: unless-stopped
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
@@ -131,23 +132,31 @@ npm run build
 
 ## Limitations
 
-- **Alpha software** — The configuration format and data model may change between alpha versions. Always back up your configuration before use.
 - **Local deployment only** — This is a single-user, local-only application. It does not support multi-user access or remote deployment.
 - **Browser compatibility** — Tested on recent versions of Chrome and Firefox. Other browsers may have unexpected behavior.
 - **Large configurations** — Teams with many agents (50+) may experience performance degradation on the graph canvas.
-- **Semantic port validation** — Connections dropped on incompatible ports are rejected, but the validation rules may evolve.
 
-## Migration from v0.1
+## Multi-team features
 
-See the [Migration guide](#migration-from-v01) below for details on upgrading from the previous public version.
+v1.0 introduces multi-team profiles:
+
+- **Team profiles** — Each team has its own complete configuration (agents, layout, metadata) stored in `studio-data/teams/`.
+- **Activation** — Switch between teams atomically with transactional backup and restore.
+- **Revisions** — Automatic and manual revisions with content hashing. Up to 3 revisions per team are kept.
+- **Duplication** — Clone a team profile to experiment without affecting the original.
+- **Migration** — Automatic migration from v0.2 single-team configuration to a "Default team" profile.
+
+## Migration from v0.2
+
+See the [Migration guide](#migration-from-v02) below for details on upgrading from the previous public version.
 
 ## Releases
 
 The current public version is:
 
-- `v0.2.0-alpha.2`
-- Status: alpha pre-release
-- Container: `ghcr.io/arthurhtr/opencode-team-studio:v0.2.0-alpha.2`
+- `v1.0.0`
+- Status: stable release
+- Container: `ghcr.io/arthurhtr/opencode-team-studio:v1.0.0`
 
 See all published versions in the [GitHub Releases](https://github.com/ArthurHtr/opencode-team-studio/releases) page.
 
@@ -163,7 +172,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to contribute to thi
 
 This project is licensed under the [Apache License 2.0](./LICENSE).
 
-## Migration from v0.1
+## Migration from v0.2
 
 ### Data model changes
 

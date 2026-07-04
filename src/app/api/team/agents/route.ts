@@ -15,4 +15,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message(error) }, { status: 400 });
   }
 }
-function message(error: unknown) { return error instanceof Error ? error.message : "Erreur inconnue"; }
+function message(error: unknown) { return error instanceof Error ? error.message : "Unknown error"; }

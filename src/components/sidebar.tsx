@@ -1,16 +1,16 @@
 "use client";
 
-import { Boxes, Cpu, DatabaseBackup, Network, Settings2, Users } from "lucide-react";
+import { Archive, Boxes, Cpu, Network, Settings2, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/team", label: "Team", icon: Network },
-  { href: "/team-summary", label: "Team Summary", icon: Users },
   { href: "/resources", label: "Resources", icon: Boxes },
   { href: "/models", label: "Models", icon: Cpu },
   { href: "/configuration", label: "Configuration", icon: Settings2 },
-  { href: "/backups", label: "Backups", icon: DatabaseBackup },
+  { href: "/my-teams", label: "My Teams", icon: Users },
+  { href: "/backups", label: "Backups", icon: Archive },
 ];
 
 function isActive(pathname: string, href: string): boolean {

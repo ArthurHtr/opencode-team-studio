@@ -26,5 +26,5 @@ export async function PUT(request: Request) {
 }
 
 function message(error: unknown) {
-  return error instanceof Error ? error.message : "Erreur inconnue";
+  return error instanceof Error ? error.message : "Unknown error";
 }

@@ -55,3 +55,20 @@ export async function atomicWrite(filePath: string, content: string): Promise<vo
 export async function removePath(filePath: string): Promise<void> {
   await rm(filePath, { recursive: true, force: true });
 }
+
+const TEAM_ALLOWED_TOP = new Set(["teams"]);
+
+export function safeTeamPath(...segments: string[]): string {
+  if (segments.length === 0) throw new Error("No path provided");
+  if (!TEAM_ALLOWED_TOP.has(segments[0])) throw new Error("Team paths must start with 'teams'");
+  if (segments.some((segment) => segment.includes("\0") || segment === ".." || segment.includes("/../"))) {
+    throw new Error("Invalid path in team directory");
+  }
+
+  const root = getConfigRoot();
+  const basePath = path.join(root, "studio-data", ...segments);
+  const resolved = path.resolve(basePath);
+  const relative = path.relative(path.join(root, "studio-data"), resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Escape from studio-data/teams denied");
+  return resolved;
+}
