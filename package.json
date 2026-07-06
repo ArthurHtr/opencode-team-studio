@@ -34,7 +34,7 @@
     "server-only": "0.0.1"
   },
   "devDependencies": {
-    "@types/node": "22.15.30",
+    "@types/node": "26.1.0",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
     "eslint": "9.35.0",
